@@ -3,7 +3,8 @@ import logging
 from flask import Flask, render_template, request, jsonify, send_file, Response, url_for
 import pandas as pd
 import io
-from analytics import fetch_portfolio_data, calculate_metrics, fetch_benchmark_data
+import psycopg2
+from analytics import fetch_portfolio_data, calculate_metrics, fetch_benchmark_data, setup_cache_table
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -15,6 +16,13 @@ app.secret_key = os.environ.get("SESSION_SECRET", "get-the-bear-default-secret")
 
 # Define benchmark ticker
 BENCHMARK_TICKER = "SPY"
+
+# Setup cache table in PostgreSQL
+try:
+    setup_cache_table()
+    logger.info("Cache table setup complete")
+except Exception as e:
+    logger.error(f"Error setting up cache table: {str(e)}")
 
 @app.route('/')
 def index():
@@ -98,10 +106,20 @@ def analyze_portfolio():
             'monthly_returns': df_monthly['Monthly Return'].tolist()
         }
         
+        # Add annual returns data
+        if 'annual_returns' in metrics:
+            chart_data['annual_returns'] = metrics['annual_returns']
+        
         # Add benchmark data to chart data if available
         if df_benchmark is not None and not df_benchmark.empty:
             chart_data['benchmark_values'] = df_benchmark['Portfolio Value'].tolist()
+            chart_data['benchmark_drawdowns'] = df_benchmark['Drawdown'].tolist()
             chart_data['benchmark_in_portfolio'] = False
+            
+            # Add benchmark annual returns if available
+            if benchmark_metrics and 'annual_returns' in benchmark_metrics:
+                chart_data['benchmark_annual_returns'] = benchmark_metrics['annual_returns']
+                
         elif benchmark_in_portfolio:
             chart_data['benchmark_in_portfolio'] = True
             chart_data['benchmark_index'] = benchmark_index
@@ -163,21 +181,32 @@ def download_returns():
             return jsonify({"error": "Could not retrieve portfolio data"}), 400
         
         # Prepare CSV
-        monthly_returns = df_monthly[['Monthly Return']].copy()
+        # Make sure we're using the actual monthly returns data
+        monthly_returns = pd.DataFrame(index=df_monthly.index)
+        monthly_returns['Portfolio_Return'] = df_monthly['Monthly Return']
         monthly_returns.index.name = 'Date'
-        monthly_returns.columns = ['Monthly_Return']
         
         # Add benchmark to the CSV if available
         if BENCHMARK_TICKER not in tickers:
             df_benchmark, benchmark_error = fetch_benchmark_data(BENCHMARK_TICKER, start_date, end_date)
             if df_benchmark is not None and not df_benchmark.empty:
-                benchmark_returns = df_benchmark[['Monthly Return']].copy()
-                benchmark_returns.columns = ['Benchmark_Return']
-                monthly_returns = monthly_returns.join(benchmark_returns, how='outer')
+                monthly_returns['Benchmark_Return'] = df_benchmark['Monthly Return']
+                
+        # Debug the output
+        logger.debug(f"CSV Data: \n{monthly_returns.head()}")
+        
+        # Make sure we have data in the CSV
+        if monthly_returns['Portfolio_Return'].sum() == 0:
+            logger.warning("CSV data has all zeros for Portfolio_Return")
+            
+        # Convert to percentage values for easier reading
+        monthly_returns['Portfolio_Return'] = monthly_returns['Portfolio_Return'] * 100
+        if 'Benchmark_Return' in monthly_returns.columns:
+            monthly_returns['Benchmark_Return'] = monthly_returns['Benchmark_Return'] * 100
         
         # Export to CSV with index (date column)
         csv_buffer = io.StringIO()
-        monthly_returns.to_csv(csv_buffer, index=True)
+        monthly_returns.to_csv(csv_buffer, index=True, float_format='%.2f')
         csv_buffer.seek(0)
         
         # Return as downloadable file

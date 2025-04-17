@@ -4,10 +4,118 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 import math
+import os
+import psycopg2
+import json
+from psycopg2.extras import Json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Get DB connection details from environment variables
+DB_URL = os.environ.get('DATABASE_URL')
+
+def setup_cache_table():
+    """
+    Create a table to cache stock price data
+    """
+    conn = psycopg2.connect(DB_URL)
+    try:
+        cursor = conn.cursor()
+        
+        # Create table for stock price cache
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS stock_price_cache (
+                ticker TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                interval TEXT NOT NULL,
+                data JSONB NOT NULL,
+                retrieved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (ticker, start_date, end_date, interval)
+            )
+        """)
+        
+        conn.commit()
+    finally:
+        conn.close()
+        
+def get_cached_stock_data(ticker, start_date, end_date, interval='1mo'):
+    """
+    Try to get stock data from cache
+    
+    Returns:
+        DataFrame or None: The cached data if available, otherwise None
+    """
+    conn = psycopg2.connect(DB_URL)
+    try:
+        cursor = conn.cursor()
+        
+        # Look for cached data
+        cursor.execute("""
+            SELECT data FROM stock_price_cache
+            WHERE ticker = %s
+            AND start_date = %s
+            AND end_date = %s
+            AND interval = %s
+        """, (ticker, start_date, end_date, interval))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            logger.info(f"Cache hit for {ticker} from {start_date} to {end_date}")
+            # Convert JSON to DataFrame
+            json_data = result[0]
+            df = pd.read_json(json_data, orient='table')
+            
+            # Ensure index is datetime type
+            df.index = pd.to_datetime(df.index)
+            
+            return df
+        else:
+            logger.info(f"Cache miss for {ticker} from {start_date} to {end_date}")
+            return None
+    finally:
+        conn.close()
+
+def cache_stock_data(ticker, df, start_date, end_date, interval='1mo'):
+    """
+    Store stock data in cache
+    
+    Args:
+        ticker (str): Stock ticker
+        df (DataFrame): Stock price data
+        start_date (str): Start date
+        end_date (str): End date
+        interval (str): Data interval
+    """
+    if df is None or df.empty:
+        logger.warning(f"Not caching empty data for {ticker}")
+        return
+    
+    conn = psycopg2.connect(DB_URL)
+    try:
+        cursor = conn.cursor()
+        
+        # Convert DataFrame to JSON
+        json_data = df.reset_index().to_json(date_format='iso', orient='table')
+        
+        # Insert or update cache
+        cursor.execute("""
+            INSERT INTO stock_price_cache (ticker, start_date, end_date, interval, data)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (ticker, start_date, end_date, interval) 
+            DO UPDATE SET data = %s, retrieved_at = CURRENT_TIMESTAMP
+        """, (ticker, start_date, end_date, interval, json_data, json_data))
+        
+        conn.commit()
+        logger.info(f"Cached data for {ticker} from {start_date} to {end_date}")
+    except Exception as e:
+        logger.error(f"Error caching data: {str(e)}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 def fetch_portfolio_data(tickers, weights, start_date, end_date):
     """
@@ -23,67 +131,96 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         tuple: (DataFrame with monthly portfolio data, list of tickers with errors)
     """
     try:
-        # Create dictionary of weights
-        weight_dict = dict(zip(tickers, weights))
+        # Clean up tickers (remove any "(Benchmark)" suffix)
+        clean_tickers = [ticker.split(" (")[0] for ticker in tickers]
         
-        # Download data
-        data = yf.download(tickers, start=start_date, end=end_date, interval='1mo', 
-                           group_by='ticker', auto_adjust=True)
+        # Create dictionary of weights with clean ticker names
+        weight_dict = dict(zip(clean_tickers, weights))
         
-        # Check for tickers with no data
+        # Initialize DataFrame for all price data
+        df = pd.DataFrame()
         error_tickers = []
-        for ticker in tickers:
-            if ticker not in data.columns.levels[0] if isinstance(data.columns, pd.MultiIndex) else ticker not in data.columns:
-                error_tickers.append(ticker)
         
+        # Fetch data for each ticker (potentially from cache)
+        for ticker in clean_tickers:
+            # Try to get from cache first
+            cached_data = get_cached_stock_data(ticker, start_date, end_date)
+            
+            if cached_data is not None:
+                # We have cached data
+                if 'Close' in cached_data.columns:
+                    df[ticker] = cached_data['Close']
+            else:
+                # No cached data, fetch from Yahoo Finance
+                try:
+                    # Download single ticker data
+                    data = yf.download(ticker, start=start_date, end=end_date, interval='1mo', auto_adjust=True)
+                    
+                    if data.empty:
+                        error_tickers.append(ticker)
+                        continue
+                    
+                    # Add to our dataframe
+                    df[ticker] = data['Close']
+                    
+                    # Cache this data for future use
+                    cache_stock_data(ticker, data, start_date, end_date)
+                    
+                except Exception as ticker_error:
+                    logger.error(f"Error fetching data for {ticker}: {str(ticker_error)}")
+                    error_tickers.append(ticker)
+        
+        # Handle any error tickers
         if error_tickers:
             logger.warning(f"Could not fetch data for: {error_tickers}")
             # Remove problematic tickers
             for ticker in error_tickers:
-                tickers.remove(ticker)
-                weights.remove(weight_dict[ticker])
+                if ticker in clean_tickers:
+                    clean_tickers.remove(ticker)
+                    
+                    # Find the corresponding weight in original list
+                    idx = clean_tickers.index(ticker) if ticker in clean_tickers else -1
+                    if idx >= 0 and idx < len(weights):
+                        weights.pop(idx)
             
             # Recalculate weights if we still have valid tickers
-            if tickers:
+            if clean_tickers:
                 total_weight = sum(weights)
-                weights = [w/total_weight for w in weights]
-                weight_dict = dict(zip(tickers, weights))
+                if total_weight > 0:
+                    weights = [w/total_weight for w in weights]
+                    weight_dict = dict(zip(clean_tickers, weights))
+                else:
+                    return None, error_tickers
             else:
                 return None, error_tickers
-        
-        # Process data based on number of tickers
-        if len(tickers) == 1:
-            # Single ticker case (no MultiIndex)
-            df = pd.DataFrame(data['Close'])
-            df.columns = [tickers[0]]
-        else:
-            # Multiple tickers case
-            df = pd.DataFrame()
-            for ticker in tickers:
-                df[ticker] = data[ticker]['Close']
         
         # Forward fill missing values (for holidays/weekends)
         df = df.ffill()
         
-        # Calculate portfolio values
-        df_monthly = df.copy()
+        if df.empty:
+            return None, error_tickers
         
         # Calculate monthly returns for each asset
-        monthly_returns = df_monthly.pct_change().dropna()
+        # Explicitly specify fill_method=None to address FutureWarning
+        monthly_returns = df.pct_change(fill_method=None).dropna()
         
         # Calculate portfolio monthly returns using weights
         portfolio_monthly_returns = pd.Series(0, index=monthly_returns.index)
         for ticker, weight in weight_dict.items():
-            portfolio_monthly_returns += monthly_returns[ticker] * weight
+            if ticker in monthly_returns.columns:
+                portfolio_monthly_returns += monthly_returns[ticker] * weight
         
         # Calculate cumulative portfolio value (starting with $1)
-        df_portfolio = pd.DataFrame(index=df_monthly.index)
-        df_portfolio['Monthly Return'] = portfolio_monthly_returns.reindex(df_monthly.index).fillna(0)
+        df_portfolio = pd.DataFrame(index=df.index)
+        df_portfolio['Monthly Return'] = portfolio_monthly_returns.reindex(df.index).fillna(0)
         df_portfolio['Portfolio Value'] = (1 + df_portfolio['Monthly Return']).cumprod()
         
         # Calculate drawdown
         df_portfolio['Peak Value'] = df_portfolio['Portfolio Value'].cummax()
         df_portfolio['Drawdown'] = (df_portfolio['Portfolio Value'] / df_portfolio['Peak Value']) - 1
+        
+        # Keep annual return data for charts
+        df_portfolio['Year'] = df_portfolio.index.year
         
         return df_portfolio, error_tickers
         
@@ -138,6 +275,18 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
         # Total return
         total_return = (final_value / initial_value) - 1
         
+        # Calculate annual returns for the chart
+        # Group by year and calculate annual returns
+        annual_returns = {}
+        if 'Year' in df_portfolio.columns:
+            # Group by year and get first/last portfolio value for each year
+            annual_data = df_portfolio.groupby('Year')['Portfolio Value'].agg(['first', 'last'])
+            
+            # Calculate annual returns
+            for year, row in annual_data.iterrows():
+                annual_return = (row['last'] / row['first']) - 1
+                annual_returns[int(year)] = annual_return
+        
         # Format metrics for display
         metrics = {
             'cagr': format_percentage(cagr),
@@ -147,7 +296,8 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
             'best_month': format_percentage(best_month),
             'worst_month': format_percentage(worst_month),
             'total_return': format_percentage(total_return),
-            'years': format_number(years, 1)
+            'years': format_number(years, 1),
+            'annual_returns': annual_returns  # Add annual returns for chart
         }
         
         return metrics
@@ -162,7 +312,8 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
             'best_month': 'N/A',
             'worst_month': 'N/A',
             'total_return': 'N/A',
-            'years': 'N/A'
+            'years': 'N/A',
+            'annual_returns': {}
         }
 
 def format_percentage(value):
@@ -191,31 +342,56 @@ def fetch_benchmark_data(ticker, start_date, end_date):
         tuple: (DataFrame with monthly benchmark data, error message or None)
     """
     try:
-        # Download benchmark data
-        data = yf.download(ticker, start=start_date, end=end_date, interval='1mo', 
-                          auto_adjust=True)
+        # Clean up ticker (remove any "(Benchmark)" suffix)
+        clean_ticker = ticker.split(" (")[0]
         
-        if data.empty:
-            return None, f"No data available for benchmark {ticker}"
+        # Try to get from cache first
+        cached_data = get_cached_stock_data(clean_ticker, start_date, end_date)
         
-        # Process data
-        df = pd.DataFrame(data['Close'])
-        df.columns = [ticker]
+        if cached_data is not None:
+            # We have cached data
+            if 'Close' in cached_data.columns:
+                df = pd.DataFrame(cached_data['Close'])
+                df.columns = [clean_ticker]
+            else:
+                return None, f"Invalid cached data format for {clean_ticker}"
+        else:
+            # No cached data, fetch from Yahoo Finance
+            try:
+                # Download benchmark data
+                data = yf.download(clean_ticker, start=start_date, end=end_date, interval='1mo', auto_adjust=True)
+                
+                if data.empty:
+                    return None, f"No data available for benchmark {clean_ticker}"
+                
+                # Process data
+                df = pd.DataFrame(data['Close'])
+                df.columns = [clean_ticker]
+                
+                # Cache this data for future use
+                cache_stock_data(clean_ticker, data, start_date, end_date)
+                
+            except Exception as ticker_error:
+                logger.error(f"Error fetching data for benchmark {clean_ticker}: {str(ticker_error)}")
+                return None, str(ticker_error)
         
         # Forward fill missing values
         df = df.ffill()
         
-        # Calculate monthly returns
-        monthly_returns = df.pct_change().dropna()
+        # Calculate monthly returns with explicit fill_method=None
+        monthly_returns = df.pct_change(fill_method=None).dropna()
         
         # Calculate cumulative value (starting with $1)
         df_benchmark = pd.DataFrame(index=df.index)
-        df_benchmark['Monthly Return'] = monthly_returns[ticker].reindex(df.index).fillna(0)
+        df_benchmark['Monthly Return'] = monthly_returns[clean_ticker].reindex(df.index).fillna(0)
         df_benchmark['Portfolio Value'] = (1 + df_benchmark['Monthly Return']).cumprod()
         
         # Calculate drawdown
         df_benchmark['Peak Value'] = df_benchmark['Portfolio Value'].cummax()
         df_benchmark['Drawdown'] = (df_benchmark['Portfolio Value'] / df_benchmark['Peak Value']) - 1
+        
+        # Keep annual return data for charts
+        df_benchmark['Year'] = df_benchmark.index.year
         
         return df_benchmark, None
         

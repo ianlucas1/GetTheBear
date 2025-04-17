@@ -64,8 +64,8 @@ function createCorrelationChart(elementId, correlationData) {
         texttemplate: '%{text}',
         textfont: {
             color: fontColors,
-            family: "'Roboto Mono', monospace",
-            size: 10
+            family: '"Inter", sans-serif',
+            size: 16
         },
         // Format the hover text to show exact correlation values
         hovertemplate: '%{y} ↔ %{x}: %{z:.2f}<extra></extra>'
@@ -76,40 +76,43 @@ function createCorrelationChart(elementId, correlationData) {
         title: {
             text: 'Returns Correlation Matrix',
             font: {
-                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                family: '"Inter", sans-serif',
                 size: 18
             }
         },
         autosize: true,
         height: 500,
         margin: {
-            l: 80,
-            r: 30,
-            b: 80,
-            t: 80,
-            pad: 5
+            l: 60,
+            r: 40,
+            t: 60,
+            b: 60
+        },
+        font: {
+            family: '"Inter", sans-serif',
+            size: 16
         },
         xaxis: {
             title: '',
             titlefont: {
-                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
-                size: 14
+                family: '"Inter", sans-serif',
+                size: 16
             },
             tickfont: {
-                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
-                size: 12
+                family: '"Inter", sans-serif',
+                size: 16
             },
             tickangle: -45
         },
         yaxis: {
             title: '',
             titlefont: {
-                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
-                size: 14
+                family: '"Inter", sans-serif',
+                size: 16
             },
             tickfont: {
-                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
-                size: 12
+                family: '"Inter", sans-serif',
+                size: 16
             }
         },
         // Add annotation explaining the heatmap
@@ -141,6 +144,14 @@ function createCorrelationChart(elementId, correlationData) {
         ]
     };
     
+    // Increase annotation font size
+    layout.annotations.forEach(anno => {
+        anno.font = {
+            family: '"Inter", sans-serif',
+            size: 16
+        };
+    });
+
     // Create the heatmap
     Plotly.newPlot(elementId, [trace], layout, {
         responsive: true,
@@ -154,6 +165,11 @@ function createCorrelationChart(elementId, correlationData) {
             width: 700,
             scale: 1
         }
+    });
+    
+    // Add window resize handler to keep chart responsive
+    window.addEventListener('resize', function() {
+        Plotly.Plots.resize(document.getElementById(elementId));
     });
 }
 

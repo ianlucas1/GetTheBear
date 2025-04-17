@@ -127,10 +127,10 @@ function updateWeightTotal() {
     // Update the weight total element
     weightTotalElement.textContent = `Total: ${totalWeight.toFixed(1)}%`;
     
-    // Add valid/invalid styling
+    // Add valid/invalid styling with weight-pill classes
     weightTotalElement.classList.remove('valid', 'invalid');
     
-    // Check if total is approximately 100% (within 0.05% as specified)
+    // Check if total is exactly 100% (within 0.05% tolerance)
     if (Math.abs(totalWeight - 100) <= 0.05) {
         weightTotalElement.classList.add('valid');
     } else {

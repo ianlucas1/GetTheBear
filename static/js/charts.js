@@ -10,7 +10,8 @@ function createCorrelationChart(elementId, correlationData) {
     // Extract tickers and matrix data
     const tickers = correlationData.tickers;
     const matrixValues = correlationData.matrix;
-
+    const textLabels = correlationData.labels || matrixValues; // Use provided labels or fall back to matrix values
+    
     // Define a color scale: blue for negative, white for zero, red for positive correlations
     const colorScale = [
         [0, '#4169E1'],        // Royal Blue for strong negative correlation
@@ -19,6 +20,26 @@ function createCorrelationChart(elementId, correlationData) {
         [0.75, '#FFCCCB'],     // Light red for weak positive correlation
         [1, '#FF0000']         // Bright red for strong positive correlation
     ];
+    
+    // Create text array with formatted labels and determine font colors
+    const text = textLabels.map(row => 
+        row.map(val => val.toFixed(2))
+    );
+    
+    // Set font color based on correlation value
+    // Dark values for light backgrounds, light values for dark backgrounds
+    const fontColors = textLabels.map(row => 
+        row.map(val => {
+            const absVal = Math.abs(val);
+            if (absVal > 0.7) {
+                // Strong correlation (positive or negative) - use white text
+                return '#FFFFFF';
+            } else {
+                // Weaker correlation - use dark text
+                return '#172B4D';
+            }
+        })
+    );
     
     // Create the heatmap trace
     const trace = {
@@ -37,6 +58,14 @@ function createCorrelationChart(elementId, correlationData) {
                 size: 14,
                 family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif"
             }
+        },
+        // Add text labels to cells
+        text: text,
+        texttemplate: '%{text}',
+        textfont: {
+            color: fontColors,
+            family: "'Roboto Mono', monospace",
+            size: 10
         },
         // Format the hover text to show exact correlation values
         hovertemplate: '%{y} ↔ %{x}: %{z:.2f}<extra></extra>'

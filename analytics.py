@@ -283,9 +283,11 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         df_portfolio['Year'] = df_portfolio.index.year
         
         # Convert correlation matrix to nested dictionary format for JSON
+        # Also include text labels for each cell (rounded to 2 decimal places)
         correlation_data = {
             'tickers': list(correlation_matrix.index),
-            'matrix': correlation_matrix.values.tolist()
+            'matrix': correlation_matrix.values.tolist(),
+            'labels': correlation_matrix.round(2).values.tolist()
         }
         
         return df_portfolio, error_tickers, correlation_data

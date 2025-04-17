@@ -198,14 +198,21 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
                 # No cached data, fetch from Yahoo Finance
                 try:
                     # Download single ticker data
-                    data = yf.download(ticker, start=start_date, end=end_date, interval='1mo', auto_adjust=True)
+                    data = yf.download(ticker, start=start_date, end=end_date, interval='1mo', auto_adjust=False)
                     
                     if data.empty:
                         error_tickers.append(ticker)
                         continue
                     
-                    # Add to our dataframe
-                    df[ticker] = data['Close']
+                    # Prefer Adj Close, but fall back to Close if not available
+                    if 'Adj Close' in data.columns:
+                        df[ticker] = data['Adj Close']
+                        # Create a copy with 'Close' column name for caching
+                        data_to_cache = data.copy()
+                        data_to_cache['Close'] = data['Adj Close']
+                    else:
+                        df[ticker] = data['Close']
+                        data_to_cache = data
                     
                     # Cache this data for future use
                     cache_stock_data(ticker, data, start_date, end_date)

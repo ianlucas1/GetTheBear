@@ -100,11 +100,98 @@ function addTickerRow() {
 }
 
 /**
- * Setup benchmark dropdown selector
+ * Setup benchmark dropdown selector with autocomplete
  */
 function setupBenchmarkControl() {
     const benchmarkSelect = document.getElementById('benchmark-select');
     const customBenchmarkInput = document.getElementById('custom-benchmark');
+    const suggestionsContainer = document.getElementById('ticker-suggestions');
+    
+    // Store tickers data for fuzzy search
+    let tickersData = [];
+    
+    // Load tickers data
+    fetch('/static/data/tickers.csv')
+        .then(response => response.text())
+        .then(csv => {
+            // Parse CSV manually (minimal implementation)
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',');
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                const values = lines[i].split(',');
+                tickersData.push({
+                    ticker: values[0],
+                    name: values[1]
+                });
+            }
+            
+            // Initialize Fuse.js for fuzzy search
+            initFuzzySearch(tickersData);
+        })
+        .catch(error => {
+            console.error('Error loading tickers data:', error);
+        });
+    
+    // Initialize Fuse.js
+    function initFuzzySearch(data) {
+        const options = {
+            includeScore: true,
+            keys: ['ticker', 'name'],
+            threshold: 0.3
+        };
+        
+        const fuse = new Fuse(data, options);
+        
+        // Setup input event for autocomplete
+        customBenchmarkInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (query.length < 1) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            
+            // Perform fuzzy search
+            const results = fuse.search(query);
+            
+            // Limit to 10 results
+            const topResults = results.slice(0, 10);
+            
+            // Build suggestions HTML
+            let suggestionsHTML = '';
+            
+            if (topResults.length > 0) {
+                topResults.forEach(result => {
+                    const item = result.item;
+                    suggestionsHTML += `
+                        <div class="suggestion-item" data-ticker="${item.ticker}">
+                            <span class="suggestion-ticker">${item.ticker}</span>
+                            <span class="suggestion-name">${item.name}</span>
+                        </div>
+                    `;
+                });
+                
+                suggestionsContainer.innerHTML = suggestionsHTML;
+                suggestionsContainer.style.display = 'block';
+                
+                // Add click event to suggestions
+                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
+                suggestionItems.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const ticker = this.getAttribute('data-ticker');
+                        const name = this.querySelector('.suggestion-name').textContent;
+                        customBenchmarkInput.value = `${ticker} (${name})`;
+                        suggestionsContainer.style.display = 'none';
+                    });
+                });
+            } else {
+                suggestionsContainer.style.display = 'none';
+            }
+        });
+    }
     
     // Handle switching between dropdown and custom input
     benchmarkSelect.addEventListener('change', function() {
@@ -115,12 +202,24 @@ function setupBenchmarkControl() {
         } else {
             customBenchmarkInput.style.display = 'none';
             customBenchmarkInput.required = false;
+            suggestionsContainer.style.display = 'none';
         }
     });
     
     // Add auto-uppercase functionality to custom benchmark input
     customBenchmarkInput.addEventListener('blur', function() {
         this.value = this.value.toUpperCase();
+        // Hide suggestions when focus is lost
+        setTimeout(() => {
+            suggestionsContainer.style.display = 'none';
+        }, 200); // Small delay to allow click on suggestion
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!customBenchmarkInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+            suggestionsContainer.style.display = 'none';
+        }
     });
 }
 
@@ -281,10 +380,18 @@ function getFormData() {
     const benchmarkSelect = document.getElementById('benchmark-select');
     
     if (benchmarkSelect.value === 'custom') {
-        benchmarkTicker = document.getElementById('custom-benchmark').value.trim().toUpperCase();
-        if (!benchmarkTicker) {
+        let customValue = document.getElementById('custom-benchmark').value.trim().toUpperCase();
+        
+        if (!customValue) {
             showError('Please enter a custom benchmark ticker');
             return null;
+        }
+        
+        // Extract just the ticker if it's in "TICKER (Fund Name)" format
+        if (customValue.includes('(')) {
+            benchmarkTicker = customValue.split('(')[0].trim();
+        } else {
+            benchmarkTicker = customValue;
         }
     } else {
         benchmarkTicker = benchmarkSelect.value;

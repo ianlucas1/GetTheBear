@@ -30,8 +30,11 @@
                         <option value="VXUS">VXUS (Vanguard ex-US)</option>
                         <option value="custom">Custom Ticker...</option>
                     </select>
-                    <input type="text" id="custom-benchmark" name="custom-benchmark" 
-                           placeholder="Enter ticker symbol" style="display: none; margin-top: 5px;">
+                    <div class="autocomplete-container">
+                        <input type="text" id="custom-benchmark" name="custom-benchmark" 
+                               placeholder="Enter ticker symbol" style="display: none; margin-top: 5px;">
+                        <div id="ticker-suggestions" class="suggestions-container"></div>
+                    </div>
                 </div>
             </div>
         </div>

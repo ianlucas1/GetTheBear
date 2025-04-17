@@ -4,6 +4,131 @@
  */
 
 /**
+ * Create correlation heatmap using Plotly
+ */
+function createCorrelationChart(elementId, correlationData) {
+    // Extract tickers and matrix data
+    const tickers = correlationData.tickers;
+    const matrixValues = correlationData.matrix;
+
+    // Define a color scale: blue for negative, white for zero, red for positive correlations
+    const colorScale = [
+        [0, '#4169E1'],        // Royal Blue for strong negative correlation
+        [0.25, '#B6D0E5'],     // Light blue for weak negative correlation
+        [0.5, '#FFFFFF'],      // White for no correlation
+        [0.75, '#FFCCCB'],     // Light red for weak positive correlation
+        [1, '#FF0000']         // Bright red for strong positive correlation
+    ];
+    
+    // Create the heatmap trace
+    const trace = {
+        z: matrixValues,
+        x: tickers,
+        y: tickers,
+        type: 'heatmap',
+        colorscale: colorScale,
+        zmin: -1,              // Minimum correlation value
+        zmax: 1,               // Maximum correlation value
+        showscale: true,
+        colorbar: {
+            title: 'Correlation',
+            titleside: 'right',
+            titlefont: {
+                size: 14,
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif"
+            }
+        },
+        // Format the hover text to show exact correlation values
+        hovertemplate: '%{y} ↔ %{x}: %{z:.2f}<extra></extra>'
+    };
+    
+    // Layout configuration for the heatmap
+    const layout = {
+        title: {
+            text: 'Returns Correlation Matrix',
+            font: {
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                size: 18
+            }
+        },
+        autosize: true,
+        height: 500,
+        margin: {
+            l: 80,
+            r: 30,
+            b: 80,
+            t: 80,
+            pad: 5
+        },
+        xaxis: {
+            title: '',
+            titlefont: {
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                size: 14
+            },
+            tickfont: {
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                size: 12
+            },
+            tickangle: -45
+        },
+        yaxis: {
+            title: '',
+            titlefont: {
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                size: 14
+            },
+            tickfont: {
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                size: 12
+            }
+        },
+        // Add annotation explaining the heatmap
+        annotations: [
+            {
+                x: 0.5,
+                y: -0.15,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'This heatmap shows the correlation between monthly returns of all assets in the portfolio.',
+                showarrow: false,
+                font: {
+                    family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                    size: 12
+                }
+            },
+            {
+                x: 0.5,
+                y: -0.2,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'Red = positive correlation (move together), Blue = negative correlation (move oppositely).',
+                showarrow: false,
+                font: {
+                    family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                    size: 12
+                }
+            }
+        ]
+    };
+    
+    // Create the heatmap
+    Plotly.newPlot(elementId, [trace], layout, {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'correlation_heatmap',
+            height: 500,
+            width: 700,
+            scale: 1
+        }
+    });
+}
+
+/**
  * Create allocation pie chart using Plotly
  */
 function createAllocationChart(elementId, legendId, tickers, weights) {

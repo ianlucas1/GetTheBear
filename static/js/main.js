@@ -477,6 +477,11 @@ function displayResults(data) {
     // Create allocation pie chart
     createAllocationChart('allocation-chart', 'allocation-legend', originalTickers, normalizedWeights);
     
+    // Create correlation heatmap if data is available
+    if (data.correlation_matrix && data.correlation_matrix.tickers && data.correlation_matrix.tickers.length > 1) {
+        createCorrelationChart('correlation-chart', data.correlation_matrix);
+    }
+    
     // Create summary view with key metrics
     createSummaryView(data.metrics, data.benchmark_metrics);
     

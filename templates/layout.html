@@ -40,5 +40,24 @@
     <!-- Custom Scripts -->
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Conditional Eruda Debug Console -->
+    <script>
+        // Only load Eruda when debug=true is in the URL
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const debugMode = urlParams.get('debug') === 'true';
+            
+            if (debugMode) {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+                document.body.appendChild(script);
+                script.onload = function() {
+                    eruda.init();
+                    console.log('Debug mode enabled');
+                };
+            }
+        })();
+    </script>
 </body>
 </html>

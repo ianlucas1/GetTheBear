@@ -496,7 +496,7 @@ function displayMetrics(portfolioMetrics, benchmarkMetrics) {
         cell.classList.add('text-end');
     });
     
-    // Portfolio metrics
+    // Portfolio metrics - existing metrics
     document.getElementById('cagr-value').textContent = portfolioMetrics.cagr;
     document.getElementById('volatility-value').textContent = portfolioMetrics.volatility;
     document.getElementById('sharpe-value').textContent = portfolioMetrics.sharpe_ratio;
@@ -506,8 +506,16 @@ function displayMetrics(portfolioMetrics, benchmarkMetrics) {
     document.getElementById('total-return-value').textContent = portfolioMetrics.total_return;
     document.getElementById('period-value').textContent = `${portfolioMetrics.years} years`;
     
+    // Portfolio metrics - new metrics
+    document.getElementById('sortino-ratio-value').textContent = portfolioMetrics.sortino_ratio;
+    document.getElementById('calmar-ratio-value').textContent = portfolioMetrics.calmar_ratio;
+    document.getElementById('max-drawdown-duration-value').textContent = portfolioMetrics.max_drawdown_duration;
+    document.getElementById('rolling-volatility-value').textContent = portfolioMetrics.rolling_volatility;
+    document.getElementById('rolling-return-value').textContent = portfolioMetrics.rolling_return;
+    
     // Benchmark metrics if available
     if (benchmarkMetrics) {
+        // Existing benchmark metrics
         document.getElementById('benchmark-cagr-value').textContent = benchmarkMetrics.cagr;
         document.getElementById('benchmark-volatility-value').textContent = benchmarkMetrics.volatility;
         document.getElementById('benchmark-sharpe-value').textContent = benchmarkMetrics.sharpe_ratio;
@@ -516,30 +524,52 @@ function displayMetrics(portfolioMetrics, benchmarkMetrics) {
         document.getElementById('benchmark-worst-month-value').textContent = benchmarkMetrics.worst_month;
         document.getElementById('benchmark-total-return-value').textContent = benchmarkMetrics.total_return;
         
-        // Add color classes to benchmark values
+        // New benchmark metrics
+        document.getElementById('benchmark-sortino-ratio-value').textContent = benchmarkMetrics.sortino_ratio;
+        document.getElementById('benchmark-calmar-ratio-value').textContent = benchmarkMetrics.calmar_ratio;
+        document.getElementById('benchmark-max-drawdown-duration-value').textContent = benchmarkMetrics.max_drawdown_duration;
+        document.getElementById('benchmark-rolling-volatility-value').textContent = benchmarkMetrics.rolling_volatility;
+        document.getElementById('benchmark-rolling-return-value').textContent = benchmarkMetrics.rolling_return;
+        
+        // Add color classes to benchmark values - existing metrics
         colorizeValue('benchmark-total-return-value', benchmarkMetrics.total_return);
         colorizeValue('benchmark-cagr-value', benchmarkMetrics.cagr);
         colorizeValue('benchmark-max-drawdown-value', benchmarkMetrics.max_drawdown);
         colorizeValue('benchmark-best-month-value', benchmarkMetrics.best_month);
         colorizeValue('benchmark-worst-month-value', benchmarkMetrics.worst_month);
+        
+        // Add color classes to benchmark values - new ratio metrics
+        colorizeValue('benchmark-sortino-ratio-value', benchmarkMetrics.sortino_ratio);
+        colorizeValue('benchmark-calmar-ratio-value', benchmarkMetrics.calmar_ratio);
+        colorizeValue('benchmark-rolling-return-value', benchmarkMetrics.rolling_return);
     } else {
-        // If no benchmark data, display N/A
+        // If no benchmark data, display N/A for all benchmark metrics
         const benchmarkElements = [
+            // Existing benchmark metrics
             'benchmark-cagr-value', 'benchmark-volatility-value', 'benchmark-sharpe-value',
             'benchmark-max-drawdown-value', 'benchmark-best-month-value', 'benchmark-worst-month-value',
-            'benchmark-total-return-value'
+            'benchmark-total-return-value',
+            // New benchmark metrics
+            'benchmark-sortino-ratio-value', 'benchmark-calmar-ratio-value', 
+            'benchmark-max-drawdown-duration-value', 'benchmark-rolling-volatility-value',
+            'benchmark-rolling-return-value'
         ];
         benchmarkElements.forEach(elementId => {
             document.getElementById(elementId).textContent = 'N/A';
         });
     }
     
-    // Add color classes to portfolio values
+    // Add color classes to portfolio values - existing metrics
     colorizeValue('total-return-value', portfolioMetrics.total_return);
     colorizeValue('cagr-value', portfolioMetrics.cagr);
     colorizeValue('max-drawdown-value', portfolioMetrics.max_drawdown);
     colorizeValue('best-month-value', portfolioMetrics.best_month);
     colorizeValue('worst-month-value', portfolioMetrics.worst_month);
+    
+    // Add color classes to portfolio values - new ratio metrics
+    colorizeValue('sortino-ratio-value', portfolioMetrics.sortino_ratio);
+    colorizeValue('calmar-ratio-value', portfolioMetrics.calmar_ratio);
+    colorizeValue('rolling-return-value', portfolioMetrics.rolling_return);
 }
 
 /**
@@ -558,6 +588,9 @@ function createSummaryView(portfolioMetrics, benchmarkMetrics) {
         { id: 'volatility', label: 'Volatility', value: portfolioMetrics.volatility },
         { id: 'sharpe', label: 'Sharpe Ratio', value: portfolioMetrics.sharpe_ratio },
         { id: 'max-drawdown', label: 'Max Drawdown', value: portfolioMetrics.max_drawdown },
+        { id: 'sortino', label: 'Sortino Ratio', value: portfolioMetrics.sortino_ratio },
+        { id: 'calmar', label: 'Calmar Ratio', value: portfolioMetrics.calmar_ratio },
+        { id: 'rolling-return', label: 'TTM Return', value: portfolioMetrics.rolling_return }
     ];
     
     // Add each metric to the summary

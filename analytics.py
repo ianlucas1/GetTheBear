@@ -338,6 +338,76 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
                 annual_return = (row['last'] / row['first']) - 1
                 annual_returns[int(year)] = annual_return
         
+        # --- NEW METRICS ---
+        
+        # Downside (Sortino) ratio
+        # Calculate negative returns (below 0%)
+        negative_returns = monthly_returns[monthly_returns < 0]
+        
+        # Calculate downside deviation (standard deviation of negative returns)
+        downside_deviation = 0
+        sortino_ratio = 0
+        if len(negative_returns) > 0:
+            downside_deviation = negative_returns.std() * np.sqrt(12)
+            
+            # Calculate Sortino ratio (using 0% as minimum acceptable return)
+            if downside_deviation > 0:
+                sortino_ratio = avg_monthly_return * np.sqrt(12) / downside_deviation
+        
+        # Calmar ratio (CAGR ÷ absolute max drawdown)
+        calmar_ratio = 0
+        if max_drawdown < 0:  # Ensure we don't divide by zero
+            calmar_ratio = cagr / abs(max_drawdown)
+        
+        # Max drawdown duration calculation
+        max_drawdown_duration = 0
+        if 'Drawdown' in df_portfolio.columns:
+            # Calculate drawdown durations
+            in_drawdown = False
+            current_drawdown_start = None
+            current_duration = 0
+            max_duration = 0
+            
+            # Iterate through portfolio values
+            for date, row in df_portfolio.iterrows():
+                drawdown = row['Drawdown']
+                
+                # Start of a drawdown
+                if not in_drawdown and drawdown < 0:
+                    in_drawdown = True
+                    current_drawdown_start = date
+                # End of a drawdown
+                elif in_drawdown and drawdown >= 0:
+                    in_drawdown = False
+                    current_duration = (date - current_drawdown_start).days / 30  # Duration in months
+                    max_duration = max(max_duration, current_duration)
+                    current_drawdown_start = None
+            
+            # Check if we're still in a drawdown at the end
+            if in_drawdown:
+                current_duration = (end_date - current_drawdown_start).days / 30  # Duration in months
+                max_duration = max(max_duration, current_duration)
+            
+            max_drawdown_duration = max_duration
+        
+        # Rolling 12-month volatility
+        rolling_volatility = None
+        if len(monthly_returns) >= 12:
+            # Calculate rolling 12-month standard deviation
+            rolling_std = monthly_returns.rolling(window=12).std() * np.sqrt(12)
+            # Get the most recent value
+            rolling_volatility = rolling_std.iloc[-1] if not rolling_std.empty else None
+        
+        # Rolling 12-month returns
+        rolling_return = None
+        if len(df_portfolio) >= 12:
+            # Calculate rolling 12-month return
+            rolling_values = df_portfolio['Portfolio Value'].rolling(window=12).apply(
+                lambda window: (window.iloc[-1] / window.iloc[0]) - 1 if len(window) == 12 else None
+            )
+            # Get the most recent value
+            rolling_return = rolling_values.iloc[-1] if not rolling_values.empty else None
+        
         # Format metrics for display
         metrics = {
             'cagr': format_percentage(cagr),
@@ -348,7 +418,14 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
             'worst_month': format_percentage(worst_month),
             'total_return': format_percentage(total_return),
             'years': format_number(years, 1),
-            'annual_returns': annual_returns  # Add annual returns for chart
+            'annual_returns': annual_returns,  # Annual returns for chart
+            
+            # New metrics
+            'sortino_ratio': format_number(sortino_ratio),
+            'calmar_ratio': format_number(calmar_ratio),
+            'max_drawdown_duration': f"{format_number(max_drawdown_duration, 1)} months",
+            'rolling_volatility': format_percentage(rolling_volatility) if rolling_volatility is not None else 'N/A',
+            'rolling_return': format_percentage(rolling_return) if rolling_return is not None else 'N/A'
         }
         
         return metrics
@@ -364,7 +441,14 @@ def calculate_metrics(df_portfolio, is_benchmark=False):
             'worst_month': 'N/A',
             'total_return': 'N/A',
             'years': 'N/A',
-            'annual_returns': {}
+            'annual_returns': {},
+            
+            # New metrics with N/A values
+            'sortino_ratio': 'N/A',
+            'calmar_ratio': 'N/A',
+            'max_drawdown_duration': 'N/A',
+            'rolling_volatility': 'N/A',
+            'rolling_return': 'N/A'
         }
 
 def format_percentage(value):

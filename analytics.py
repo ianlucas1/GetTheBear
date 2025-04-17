@@ -91,12 +91,13 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         logger.exception(f"Error fetching portfolio data: {str(e)}")
         return None, tickers
 
-def calculate_metrics(df_portfolio):
+def calculate_metrics(df_portfolio, is_benchmark=False):
     """
     Calculate key portfolio performance metrics.
     
     Args:
         df_portfolio (DataFrame): Portfolio data with monthly returns and values
+        is_benchmark (bool): Whether metrics are for a benchmark in portfolio
         
     Returns:
         dict: Dictionary containing calculated metrics
@@ -175,3 +176,49 @@ def format_number(value, decimals=2):
     if value is None or math.isnan(value):
         return 'N/A'
     return f"{value:.{decimals}f}"
+
+
+def fetch_benchmark_data(ticker, start_date, end_date):
+    """
+    Fetch benchmark data for comparison.
+    
+    Args:
+        ticker (str): Benchmark ticker symbol (e.g., 'SPY')
+        start_date (str): Start date in YYYY-MM-DD format
+        end_date (str): End date in YYYY-MM-DD format
+        
+    Returns:
+        tuple: (DataFrame with monthly benchmark data, error message or None)
+    """
+    try:
+        # Download benchmark data
+        data = yf.download(ticker, start=start_date, end=end_date, interval='1mo', 
+                          auto_adjust=True)
+        
+        if data.empty:
+            return None, f"No data available for benchmark {ticker}"
+        
+        # Process data
+        df = pd.DataFrame(data['Close'])
+        df.columns = [ticker]
+        
+        # Forward fill missing values
+        df = df.ffill()
+        
+        # Calculate monthly returns
+        monthly_returns = df.pct_change().dropna()
+        
+        # Calculate cumulative value (starting with $1)
+        df_benchmark = pd.DataFrame(index=df.index)
+        df_benchmark['Monthly Return'] = monthly_returns[ticker].reindex(df.index).fillna(0)
+        df_benchmark['Portfolio Value'] = (1 + df_benchmark['Monthly Return']).cumprod()
+        
+        # Calculate drawdown
+        df_benchmark['Peak Value'] = df_benchmark['Portfolio Value'].cummax()
+        df_benchmark['Drawdown'] = (df_benchmark['Portfolio Value'] / df_benchmark['Peak Value']) - 1
+        
+        return df_benchmark, None
+        
+    except Exception as e:
+        logger.exception(f"Error fetching benchmark data: {str(e)}")
+        return None, str(e)

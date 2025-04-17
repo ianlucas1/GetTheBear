@@ -46,54 +46,62 @@
     <h2 class="section-title">Portfolio Analysis Results</h2>
     
     <!-- Metrics Summary -->
-    <div class="metrics-container">
-        <div class="metric-card">
-            <div class="metric-title">CAGR</div>
-            <div class="metric-value" id="cagr-value">--</div>
-            <div class="metric-desc">Compound Annual Growth Rate</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">VOLATILITY</div>
-            <div class="metric-value" id="volatility-value">--</div>
-            <div class="metric-desc">Annualized Standard Deviation</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">SHARPE RATIO</div>
-            <div class="metric-value" id="sharpe-value">--</div>
-            <div class="metric-desc">Risk-Adjusted Return</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">MAX DRAWDOWN</div>
-            <div class="metric-value" id="max-drawdown-value">--</div>
-            <div class="metric-desc">Largest Peak-to-Trough Decline</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">BEST MONTH</div>
-            <div class="metric-value" id="best-month-value">--</div>
-            <div class="metric-desc">Highest Monthly Return</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">WORST MONTH</div>
-            <div class="metric-value" id="worst-month-value">--</div>
-            <div class="metric-desc">Lowest Monthly Return</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">TOTAL RETURN</div>
-            <div class="metric-value" id="total-return-value">--</div>
-            <div class="metric-desc">Overall Gain/Loss</div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-title">TIME PERIOD</div>
-            <div class="metric-value" id="period-value">--</div>
-            <div class="metric-desc">Analysis Timeframe</div>
-        </div>
+    <div class="metrics-table">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid #DFE1E6;">Metric</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;">Portfolio</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;">Benchmark (SPY)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">CAGR</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="cagr-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-cagr-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Volatility</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="volatility-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-volatility-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Sharpe Ratio</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="sharpe-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-sharpe-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Max Drawdown</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="max-drawdown-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-max-drawdown-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Total Return</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="total-return-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-total-return-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Best Month</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="best-month-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-best-month-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Worst Month</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="worst-month-value">--</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-worst-month-value">--</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Time Period</td>
+                    <td style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="period-value" colspan="2">--</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Benchmark indicator for when SPY is in the portfolio -->
+    <div id="benchmark-in-portfolio-notice" style="display: none; background-color: #E6EFFC; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;">
+        <strong>Note:</strong> The benchmark (SPY) is included in your portfolio. Separate metrics are shown based on SPY's performance alone.
     </div>
     
     <!-- Download Results Button -->

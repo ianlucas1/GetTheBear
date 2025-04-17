@@ -249,8 +249,28 @@ function displayResults(data) {
     // Enable download button
     document.getElementById('download-returns-btn').disabled = false;
     
-    // Display metrics
-    displayMetrics(data.metrics);
+    // Display metrics for portfolio and benchmark
+    displayMetrics(data.metrics, data.benchmark_metrics);
+    
+    // Handle the benchmark in portfolio notice
+    const benchmarkNotice = document.getElementById('benchmark-in-portfolio-notice');
+    if (data.chart_data.benchmark_in_portfolio) {
+        benchmarkNotice.style.display = 'block';
+        
+        // Add "(Benchmark)" label to ticker
+        if (data.chart_data.benchmark_index >= 0) {
+            const tickerRows = document.querySelectorAll('.ticker-item');
+            if (tickerRows.length > data.chart_data.benchmark_index) {
+                const benchmarkRow = tickerRows[data.chart_data.benchmark_index];
+                const tickerInput = benchmarkRow.querySelector('.ticker-input');
+                if (tickerInput && tickerInput.value === 'SPY') {
+                    tickerInput.value += ' (Benchmark)';
+                }
+            }
+        }
+    } else {
+        benchmarkNotice.style.display = 'none';
+    }
     
     // Create charts
     createEquityCurveChart('equity-chart', data.chart_data);
@@ -266,22 +286,51 @@ function displayResults(data) {
 /**
  * Display metrics in the metrics table
  */
-function displayMetrics(metrics) {
-    document.getElementById('cagr-value').textContent = metrics.cagr;
-    document.getElementById('volatility-value').textContent = metrics.volatility;
-    document.getElementById('sharpe-value').textContent = metrics.sharpe_ratio;
-    document.getElementById('max-drawdown-value').textContent = metrics.max_drawdown;
-    document.getElementById('best-month-value').textContent = metrics.best_month;
-    document.getElementById('worst-month-value').textContent = metrics.worst_month;
-    document.getElementById('total-return-value').textContent = metrics.total_return;
-    document.getElementById('period-value').textContent = `${metrics.years} years`;
+function displayMetrics(portfolioMetrics, benchmarkMetrics) {
+    // Portfolio metrics
+    document.getElementById('cagr-value').textContent = portfolioMetrics.cagr;
+    document.getElementById('volatility-value').textContent = portfolioMetrics.volatility;
+    document.getElementById('sharpe-value').textContent = portfolioMetrics.sharpe_ratio;
+    document.getElementById('max-drawdown-value').textContent = portfolioMetrics.max_drawdown;
+    document.getElementById('best-month-value').textContent = portfolioMetrics.best_month;
+    document.getElementById('worst-month-value').textContent = portfolioMetrics.worst_month;
+    document.getElementById('total-return-value').textContent = portfolioMetrics.total_return;
+    document.getElementById('period-value').textContent = `${portfolioMetrics.years} years`;
     
-    // Add color classes
-    colorizeValue('total-return-value', metrics.total_return);
-    colorizeValue('cagr-value', metrics.cagr);
-    colorizeValue('max-drawdown-value', metrics.max_drawdown);
-    colorizeValue('best-month-value', metrics.best_month);
-    colorizeValue('worst-month-value', metrics.worst_month);
+    // Benchmark metrics if available
+    if (benchmarkMetrics) {
+        document.getElementById('benchmark-cagr-value').textContent = benchmarkMetrics.cagr;
+        document.getElementById('benchmark-volatility-value').textContent = benchmarkMetrics.volatility;
+        document.getElementById('benchmark-sharpe-value').textContent = benchmarkMetrics.sharpe_ratio;
+        document.getElementById('benchmark-max-drawdown-value').textContent = benchmarkMetrics.max_drawdown;
+        document.getElementById('benchmark-best-month-value').textContent = benchmarkMetrics.best_month;
+        document.getElementById('benchmark-worst-month-value').textContent = benchmarkMetrics.worst_month;
+        document.getElementById('benchmark-total-return-value').textContent = benchmarkMetrics.total_return;
+        
+        // Add color classes to benchmark values
+        colorizeValue('benchmark-total-return-value', benchmarkMetrics.total_return);
+        colorizeValue('benchmark-cagr-value', benchmarkMetrics.cagr);
+        colorizeValue('benchmark-max-drawdown-value', benchmarkMetrics.max_drawdown);
+        colorizeValue('benchmark-best-month-value', benchmarkMetrics.best_month);
+        colorizeValue('benchmark-worst-month-value', benchmarkMetrics.worst_month);
+    } else {
+        // If no benchmark data, display N/A
+        const benchmarkElements = [
+            'benchmark-cagr-value', 'benchmark-volatility-value', 'benchmark-sharpe-value',
+            'benchmark-max-drawdown-value', 'benchmark-best-month-value', 'benchmark-worst-month-value',
+            'benchmark-total-return-value'
+        ];
+        benchmarkElements.forEach(elementId => {
+            document.getElementById(elementId).textContent = 'N/A';
+        });
+    }
+    
+    // Add color classes to portfolio values
+    colorizeValue('total-return-value', portfolioMetrics.total_return);
+    colorizeValue('cagr-value', portfolioMetrics.cagr);
+    colorizeValue('max-drawdown-value', portfolioMetrics.max_drawdown);
+    colorizeValue('best-month-value', portfolioMetrics.best_month);
+    colorizeValue('worst-month-value', portfolioMetrics.worst_month);
 }
 
 /**
@@ -321,25 +370,19 @@ function downloadReturns() {
         return;
     }
     
-    // Create form for POST submission
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/download_returns';
+    // Construct URL with query parameters
+    const url = `/download_returns?tickers=${formData.tickers.join(',')}&weights=${formData.weights.join(',')}&start_date=${formData.start_date}&end_date=${formData.end_date}`;
     
-    // Create hidden field with JSON data
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'portfolio_data';
-    input.value = JSON.stringify(formData);
+    // Create temporary link to download the file
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.download = 'portfolio_returns.csv';
     
-    form.appendChild(input);
-    document.body.appendChild(form);
-    
-    // Submit form to trigger file download
-    form.submit();
-    
-    // Remove form
-    document.body.removeChild(form);
+    // Append to document, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
     showLoading(false);
 }

@@ -10,7 +10,8 @@ function createEquityCurveChart(elementId, data) {
     const dates = data.dates;
     const portfolioValues = data.portfolio_values;
     
-    const trace = {
+    // Portfolio trace
+    const portfolioTrace = {
         x: dates,
         y: portfolioValues,
         type: 'scatter',
@@ -21,6 +22,30 @@ function createEquityCurveChart(elementId, data) {
             width: 2
         }
     };
+    
+    // Array of traces, starting with portfolio
+    const traces = [portfolioTrace];
+    
+    // Add benchmark trace if available
+    if (data.benchmark_values) {
+        // Separate benchmark data
+        const benchmarkTrace = {
+            x: dates,
+            y: data.benchmark_values,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Benchmark (SPY)',
+            line: {
+                color: '#6554C0', // Different color for benchmark
+                width: 2,
+                dash: 'dash' // Make it dashed to distinguish
+            }
+        };
+        traces.push(benchmarkTrace);
+    } else if (data.benchmark_in_portfolio) {
+        // Add annotation that benchmark is part of portfolio
+        // Will be handled in displayResults
+    }
     
     const layout = {
         title: 'Portfolio Equity Curve',
@@ -63,6 +88,10 @@ function createEquityCurveChart(elementId, data) {
             family: 'Inter, sans-serif',
             size: 12,
             color: '#172B4D'
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.15
         }
     };
     
@@ -73,7 +102,7 @@ function createEquityCurveChart(elementId, data) {
         displaylogo: false
     };
     
-    Plotly.newPlot(elementId, [trace], layout, config);
+    Plotly.newPlot(elementId, traces, layout, config);
 }
 
 /**

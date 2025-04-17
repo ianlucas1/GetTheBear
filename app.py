@@ -57,12 +57,16 @@ def analyze_portfolio():
         if len(tickers) != len(weights):
             return jsonify({"error": "Number of tickers must match number of weights"}), 400
             
-        # Normalize weights to sum to 1
+        # Convert weights to float
         weights = [float(w) for w in weights]
         weight_sum = sum(weights)
-        if weight_sum <= 0:
-            return jsonify({"error": "Sum of weights must be positive"}), 400
-        weights = [w / weight_sum for w in weights]
+        
+        # Check if weights sum to approximately 100%
+        if abs(weight_sum - 100) > 0.1:
+            return jsonify({"error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"}), 400
+        
+        # Normalize weights to sum to 1 for calculations
+        weights = [w / 100.0 for w in weights]
         
         # Clean up benchmark ticker
         benchmark_ticker = benchmark_ticker.split(" (")[0].strip().upper()
@@ -193,11 +197,13 @@ def download_returns():
         if len(tickers) != len(weights):
             return jsonify({"error": "Number of tickers must match number of weights"}), 400
         
-        # Normalize weights to sum to 1
+        # Check if weights sum to approximately 100%
         weight_sum = sum(weights)
-        if weight_sum <= 0:
-            return jsonify({"error": "Sum of weights must be positive"}), 400
-        weights = [w / weight_sum for w in weights]
+        if abs(weight_sum - 100) > 0.1:
+            return jsonify({"error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"}), 400
+            
+        # Normalize weights to sum to 1 for calculations
+        weights = [w / 100.0 for w in weights]
         
         # Clean up benchmark ticker
         benchmark_ticker = benchmark_ticker.split(" (")[0].strip().upper()

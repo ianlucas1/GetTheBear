@@ -418,6 +418,13 @@ function getFormData() {
         return null;
     }
     
+    // Validate weight total is approximately 100%
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    if (Math.abs(totalWeight - 100) > 0.1) {
+        showError(`Weights must sum to 100% - your total is ${totalWeight.toFixed(1)}%`);
+        return null;
+    }
+    
     // Get date range
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;

@@ -1,0 +1,49 @@
+> **chore/ui: polish weights controls & correlation heat‑map**
+>
+> ---
+> #### 1 Weights controls  
+> **(files: `templates/index.html`, `static/js/weights.js`, `static/css/styles.css`)**
+>
+> 1. **Equal Weights button**  
+>    * When clicked, divide **exactly 100 %** by *n* tickers and write full‑precision values to the inputs, then round **display** to two decimals (e.g. for 3 tickers: `33.34, 33.33, 33.33`).  
+>    * After update, fire the same `input` event so running total logic runs automatically.
+>
+> 2. **Running‑total indicator**  
+>    * Move it directly **under** the last weight row (before the buttons).  
+>    * Render as `<div id="weight‑sum" class="text-sm font-medium">Total: 99.9 %</div>`.  
+>    * Width should be *auto* (just enough to fit the text).  
+>    * Text color rules  
+>        * Green (`text‑green‑600`) when total within ±0.05 % of 100 %.  
+>        * Red (`text‑red‑600`) otherwise.  
+>    * Hide the browser’s “nearest valid value” tooltip entirely — remove `max="100"` and rely on our JS validation instead.
+>
+> 3. **Error toast**  
+>    * If user clicks **Analyze** with total ≠ 100 % the backend returns  
+>      ```json
+>      { "error": "Weights must sum to 100 % – your total is 99.9 %." }
+>      ```  
+>      Show that message in the existing red toast (no native tooltip).
+>
+> 4. **Button layout**  
+>    * Place **Equal Weights** *right of* the total indicator.  
+>    * Keep **Add Ticker** on its own line under the list.
+>
+> ---
+> #### 2 Correlation heat‑map polish  
+> **(files: `analytics.py` – already returns matrix; `static/js/correlation.js`)**
+>
+> 1. **Fit padding** – Add `margin: 0` to the Plotly layout (`margin: {l:80,r:80,t:40,b:80}`) so the plot fills the card.  
+> 2. **Font** – Use the main UI font (`"Inter", sans-serif`); set `textfont: {family:"Inter, sans-serif", size:14}`.  
+> 3. **Scaling** – call `Plotly.Plots.resize()` on window resize so it never overflows the card.  
+> 4. **Number contrast** – If |r| > 0.7 set label color white, else black.
+>
+> ---
+> #### 3 Acceptance
+> * Click **Equal Weights** with 3 tickers → inputs = 33.34|33.33|33.33, total 100 % (green).  
+> * Change any weight so total ≠ 100 % → total text turns red; analyze returns “Weights must sum…” toast.  
+> * Tooltip about “nearest valid value” never shows.  
+> * Correlation tab: heat‑map fills card, numbers legible and in Inter font.
+>
+> ---
+> **Commit message**  
+> `chore/ui: fix equal‑weights logic, weight total display & heat‑map styling`

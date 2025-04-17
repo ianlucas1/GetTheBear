@@ -84,11 +84,21 @@ function setupTickerControls() {
         const tickerRows = document.querySelectorAll('.ticker-item');
         
         if (tickerRows.length > 0) {
-            const equalWeight = (100 / tickerRows.length).toFixed(1);
+            // Distribute 100% evenly with the last ticker getting any remainder
+            const numTickers = tickerRows.length;
+            const baseWeight = Math.floor((100 * 100) / numTickers) / 100; // Two decimal precision
+            let remainingWeight = 100 - (baseWeight * (numTickers - 1));
+            remainingWeight = parseFloat(remainingWeight.toFixed(2)); // Ensure two decimal precision
             
-            tickerRows.forEach(row => {
+            // Set weights for all ticker inputs
+            tickerRows.forEach((row, index) => {
                 const weightInput = row.querySelector('.weight-input');
-                weightInput.value = equalWeight;
+                // Last ticker gets the remainder to ensure exactly 100%
+                weightInput.value = (index === numTickers - 1) ? remainingWeight : baseWeight;
+                
+                // Trigger input event for validation
+                const inputEvent = new Event('input', { bubbles: true });
+                weightInput.dispatchEvent(inputEvent);
             });
             
             updateWeightTotal();
@@ -120,8 +130,8 @@ function updateWeightTotal() {
     // Add valid/invalid styling
     weightTotalElement.classList.remove('valid', 'invalid');
     
-    // Check if total is approximately 100% (within 0.1 to account for floating point errors)
-    if (Math.abs(totalWeight - 100) <= 0.1) {
+    // Check if total is approximately 100% (within 0.05% as specified)
+    if (Math.abs(totalWeight - 100) <= 0.05) {
         weightTotalElement.classList.add('valid');
     } else {
         weightTotalElement.classList.add('invalid');
@@ -142,7 +152,7 @@ function addTickerRow() {
             <input type="text" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
         </div>
         <div class="ticker-weight">
-            <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="1" required>
+            <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
         </div>
         <button type="button" class="btn btn-danger btn-sm remove-ticker">×</button>
     `;
@@ -418,9 +428,9 @@ function getFormData() {
         return null;
     }
     
-    // Validate weight total is approximately 100%
+    // Validate weight total is exactly 100% (with a small tolerance of 0.05%)
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-    if (Math.abs(totalWeight - 100) > 0.1) {
+    if (Math.abs(totalWeight - 100) > 0.05) {
         showError(`Weights must sum to 100% - your total is ${totalWeight.toFixed(1)}%`);
         return null;
     }

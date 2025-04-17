@@ -61,8 +61,8 @@ def analyze_portfolio():
         weights = [float(w) for w in weights]
         weight_sum = sum(weights)
         
-        # Check if weights sum to approximately 100%
-        if abs(weight_sum - 100) > 0.1:
+        # Check if weights sum to exactly 100% (with a small tolerance of 0.05%)
+        if abs(weight_sum - 100) > 0.05:
             return jsonify({"error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"}), 400
         
         # Normalize weights to sum to 1 for calculations
@@ -197,9 +197,9 @@ def download_returns():
         if len(tickers) != len(weights):
             return jsonify({"error": "Number of tickers must match number of weights"}), 400
         
-        # Check if weights sum to approximately 100%
+        # Check if weights sum to exactly 100% (with a small tolerance of 0.05%)
         weight_sum = sum(weights)
-        if abs(weight_sum - 100) > 0.1:
+        if abs(weight_sum - 100) > 0.05:
             return jsonify({"error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"}), 400
             
         # Normalize weights to sum to 1 for calculations

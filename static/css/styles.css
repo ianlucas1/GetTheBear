@@ -149,6 +149,33 @@ select {
   flex: 1;
 }
 
+/* Weight controls styling */
+.weights-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.weight-total {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-family: 'Roboto Mono', monospace;
+  background-color: var(--light-gray);
+}
+
+.weight-total.valid {
+  color: var(--secondary);
+  background-color: rgba(0, 135, 90, 0.1);
+}
+
+.weight-total.invalid {
+  color: var(--accent);
+  background-color: rgba(222, 53, 11, 0.1);
+}
+
 /* Buttons */
 .btn {
   padding: 10px 16px;

@@ -40,6 +40,7 @@ function initializeDatePicker() {
 function setupTickerControls() {
     const addTickerBtn = document.getElementById('add-ticker');
     const tickerInputsContainer = document.getElementById('ticker-inputs');
+    const equalWeightsBtn = document.getElementById('btn-equal-weights');
     
     // Add default ticker row
     addTickerRow();
@@ -57,6 +58,7 @@ function setupTickerControls() {
             // Only remove if we have more than one ticker
             if (document.querySelectorAll('.ticker-item').length > 1) {
                 tickerRow.remove();
+                updateWeightTotal(); // Update total after removing a row
             } else {
                 showError('Portfolio must contain at least one ticker');
             }
@@ -69,6 +71,61 @@ function setupTickerControls() {
             e.target.value = e.target.value.toUpperCase();
         }
     }, true);
+    
+    // Add listener for weight input changes
+    tickerInputsContainer.addEventListener('input', function(e) {
+        if (e.target.classList.contains('weight-input')) {
+            updateWeightTotal();
+        }
+    });
+    
+    // Set equal weights for all tickers
+    equalWeightsBtn.addEventListener('click', function() {
+        const tickerRows = document.querySelectorAll('.ticker-item');
+        
+        if (tickerRows.length > 0) {
+            const equalWeight = (100 / tickerRows.length).toFixed(1);
+            
+            tickerRows.forEach(row => {
+                const weightInput = row.querySelector('.weight-input');
+                weightInput.value = equalWeight;
+            });
+            
+            updateWeightTotal();
+        }
+    });
+    
+    // Initialize weight total
+    updateWeightTotal();
+}
+
+/**
+ * Update the weight total indicator
+ */
+function updateWeightTotal() {
+    const weightInputs = document.querySelectorAll('.weight-input');
+    const weightTotalElement = document.getElementById('weight-sum');
+    
+    let totalWeight = 0;
+    
+    // Sum all weight inputs
+    weightInputs.forEach(input => {
+        const weight = parseFloat(input.value) || 0;
+        totalWeight += weight;
+    });
+    
+    // Update the weight total element
+    weightTotalElement.textContent = `Total: ${totalWeight.toFixed(1)}%`;
+    
+    // Add valid/invalid styling
+    weightTotalElement.classList.remove('valid', 'invalid');
+    
+    // Check if total is approximately 100% (within 0.1 to account for floating point errors)
+    if (Math.abs(totalWeight - 100) <= 0.1) {
+        weightTotalElement.classList.add('valid');
+    } else {
+        weightTotalElement.classList.add('invalid');
+    }
 }
 
 /**
@@ -85,7 +142,7 @@ function addTickerRow() {
             <input type="text" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
         </div>
         <div class="ticker-weight">
-            <input type="number" class="weight-input" placeholder="Weight %" min="0" step="1" value="100" required>
+            <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="1" required>
         </div>
         <button type="button" class="btn btn-danger btn-sm remove-ticker">×</button>
     `;

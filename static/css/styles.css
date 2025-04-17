@@ -152,12 +152,16 @@ select {
 /* Weight controls styling */
 .weights-controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 16px;
-  max-width: 450px;
+}
+
+.weight-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
@@ -168,9 +172,9 @@ select {
 
 .weight-pill {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 16px;
   font-family: 'Roboto Mono', monospace;
   background-color: #F0F0F0;
   display: inline-block;

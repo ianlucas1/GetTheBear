@@ -84,17 +84,35 @@ function setupTickerControls() {
         const tickerRows = document.querySelectorAll('.ticker-item');
         
         if (tickerRows.length > 0) {
-            // Distribute 100% evenly with the last ticker getting any remainder
+            // Distribute exactly 100% evenly with precise decimal handling
             const numTickers = tickerRows.length;
-            const baseWeight = Math.floor((100 * 100) / numTickers) / 100; // Two decimal precision
-            let remainingWeight = 100 - (baseWeight * (numTickers - 1));
-            remainingWeight = parseFloat(remainingWeight.toFixed(2)); // Ensure two decimal precision
+            
+            // Calculate equal weight with full precision
+            const equalWeight = 100 / numTickers;
+            
+            // Calculate rounded weights (2 decimal places)
+            const weights = Array(numTickers).fill(0).map(() => Math.floor(equalWeight * 100) / 100);
+            
+            // Calculate the sum after rounding
+            const sumAfterRounding = weights.reduce((sum, w) => sum + w, 0);
+            
+            // Calculate the remainder needed to reach exactly 100%
+            const remainder = parseFloat((100 - sumAfterRounding).toFixed(2));
+            
+            // Distribute the remainder among the first few items
+            if (remainder > 0) {
+                const incrementValue = 0.01;
+                let remainingIncrement = remainder * 100; // Convert to cents
+                
+                for (let i = 0; i < remainingIncrement; i++) {
+                    weights[i % numTickers] += incrementValue;
+                }
+            }
             
             // Set weights for all ticker inputs
             tickerRows.forEach((row, index) => {
                 const weightInput = row.querySelector('.weight-input');
-                // Last ticker gets the remainder to ensure exactly 100%
-                weightInput.value = (index === numTickers - 1) ? remainingWeight : baseWeight;
+                weightInput.value = weights[index].toFixed(2);
                 
                 // Trigger input event for validation
                 const inputEvent = new Event('input', { bubbles: true });
@@ -428,7 +446,7 @@ function getFormData() {
         return null;
     }
     
-    // Validate weight total is exactly 100% (with a small tolerance of 0.05%)
+    // Validate weight total is exactly 100% (with a stricter tolerance of 0.05%)
     const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
     if (Math.abs(totalWeight - 100) > 0.05) {
         showError(`Weights must sum to 100% - your total is ${totalWeight.toFixed(1)}%`);

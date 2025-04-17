@@ -112,18 +112,43 @@ function createDrawdownChart(elementId, data) {
     const dates = data.dates;
     const drawdowns = data.drawdowns.map(d => d * 100); // Convert to percentage
     
-    const trace = {
+    // Portfolio drawdown trace
+    const portfolioTrace = {
         x: dates,
         y: drawdowns,
         type: 'scatter',
         mode: 'lines',
-        name: 'Drawdown',
+        name: 'Portfolio Drawdown',
         fill: 'tozeroy',
         line: {
             color: '#DE350B',
             width: 2
         }
     };
+    
+    // Array of traces, starting with portfolio
+    const traces = [portfolioTrace];
+    
+    // Add benchmark trace if available
+    if (data.benchmark_drawdowns) {
+        const benchmarkDrawdowns = data.benchmark_drawdowns.map(d => d * 100); // Convert to percentage
+        
+        // Benchmark trace
+        const benchmarkTrace = {
+            x: dates,
+            y: benchmarkDrawdowns,
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Benchmark Drawdown',
+            line: {
+                color: '#6554C0',
+                width: 2,
+                dash: 'dash'
+            }
+        };
+        
+        traces.push(benchmarkTrace);
+    }
     
     const layout = {
         title: 'Portfolio Drawdown',
@@ -168,6 +193,10 @@ function createDrawdownChart(elementId, data) {
             family: 'Inter, sans-serif',
             size: 12,
             color: '#172B4D'
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.15
         }
     };
     
@@ -178,35 +207,77 @@ function createDrawdownChart(elementId, data) {
         displaylogo: false
     };
     
-    Plotly.newPlot(elementId, [trace], layout, config);
+    Plotly.newPlot(elementId, traces, layout, config);
 }
 
 /**
- * Create a monthly returns chart using Plotly
+ * Create an annual returns chart using Plotly
  */
-function createMonthlyReturnsChart(elementId, data) {
-    const dates = data.dates;
-    const monthlyReturns = data.monthly_returns.map(r => r * 100); // Convert to percentage
+function createAnnualReturnsChart(elementId, data) {
+    // Extract annual returns data
+    const annualReturnsData = data.annual_returns || {};
+    const benchmarkAnnualReturnsData = data.benchmark_annual_returns || {};
     
-    // Create colors array (green for positive, red for negative)
-    const colors = monthlyReturns.map(value => 
+    // Get years from portfolio and benchmark data
+    const years = Object.keys(annualReturnsData).sort();
+    
+    // If no annual data is available, show a message
+    if (years.length === 0) {
+        document.getElementById(elementId).innerHTML = 
+            '<div class="alert alert-info mt-4">Not enough data to calculate annual returns.</div>';
+        return;
+    }
+    
+    // Extract values for portfolio returns
+    const annualReturns = years.map(year => annualReturnsData[year] * 100); // Convert to percentage
+    
+    // Create colors array for portfolio (green for positive, red for negative)
+    const colors = annualReturns.map(value => 
         value >= 0 ? '#00875A' : '#DE350B'
     );
     
-    const trace = {
-        x: dates,
-        y: monthlyReturns,
+    // Portfolio return trace
+    const portfolioTrace = {
+        x: years,
+        y: annualReturns,
         type: 'bar',
-        name: 'Monthly Return',
+        name: 'Portfolio Return',
         marker: {
             color: colors
         }
     };
     
+    // Array of traces, starting with portfolio
+    const traces = [portfolioTrace];
+    
+    // Add benchmark trace if available
+    if (Object.keys(benchmarkAnnualReturnsData).length > 0) {
+        // Extract benchmark returns for the same years
+        const benchmarkReturns = years.map(year => {
+            return benchmarkAnnualReturnsData[year] ? benchmarkAnnualReturnsData[year] * 100 : null;
+        });
+        
+        // Benchmark trace
+        const benchmarkTrace = {
+            x: years,
+            y: benchmarkReturns,
+            type: 'bar',
+            name: 'Benchmark (SPY)',
+            marker: {
+                color: '#6554C0'
+            },
+            opacity: 0.7
+        };
+        
+        traces.push(benchmarkTrace);
+    }
+    
     const layout = {
-        title: 'Monthly Returns',
+        title: 'Annual Returns',
         xaxis: {
-            title: 'Date',
+            title: 'Year',
+            tickmode: 'array',
+            tickvals: years,
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
@@ -245,6 +316,11 @@ function createMonthlyReturnsChart(elementId, data) {
             family: 'Inter, sans-serif',
             size: 12,
             color: '#172B4D'
+        },
+        barmode: 'group',
+        legend: {
+            orientation: 'h',
+            y: -0.15
         }
     };
     
@@ -255,5 +331,5 @@ function createMonthlyReturnsChart(elementId, data) {
         displaylogo: false
     };
     
-    Plotly.newPlot(elementId, [trace], layout, config);
+    Plotly.newPlot(elementId, traces, layout, config);
 }

@@ -201,9 +201,22 @@ function getFormData() {
     
     // Get ticker symbols and weights
     const tickerRows = document.querySelectorAll('.ticker-item');
+    let spyFound = false;
+    
     tickerRows.forEach(row => {
-        const ticker = row.querySelector('.ticker-input').value.trim().toUpperCase();
+        let ticker = row.querySelector('.ticker-input').value.trim().toUpperCase();
         const weight = parseFloat(row.querySelector('.weight-input').value);
+        
+        // If the ticker contains a benchmark label, clean it up
+        if (ticker.includes(' (BENCHMARK)')) {
+            ticker = ticker.replace(' (BENCHMARK)', '');
+        }
+        
+        // Check if this is SPY, and if so, mark it as a benchmark
+        if (ticker === 'SPY' && !spyFound) {
+            ticker = 'SPY (BENCHMARK)';
+            spyFound = true;
+        }
         
         if (ticker && !isNaN(weight) && weight > 0) {
             tickers.push(ticker);
@@ -256,6 +269,7 @@ function displayResults(data) {
     const benchmarkNotice = document.getElementById('benchmark-in-portfolio-notice');
     if (data.chart_data.benchmark_in_portfolio) {
         benchmarkNotice.style.display = 'block';
+        benchmarkNotice.textContent = 'Note: SPY is included in your portfolio and used as the benchmark.';
         
         // Add "(Benchmark)" label to ticker
         if (data.chart_data.benchmark_index >= 0) {
@@ -263,8 +277,11 @@ function displayResults(data) {
             if (tickerRows.length > data.chart_data.benchmark_index) {
                 const benchmarkRow = tickerRows[data.chart_data.benchmark_index];
                 const tickerInput = benchmarkRow.querySelector('.ticker-input');
-                if (tickerInput && tickerInput.value === 'SPY') {
-                    tickerInput.value += ' (Benchmark)';
+                if (tickerInput && tickerInput.value.toUpperCase().includes('SPY')) {
+                    // Make sure we don't add the label multiple times
+                    if (!tickerInput.value.includes('(BENCHMARK)')) {
+                        tickerInput.value = 'SPY (BENCHMARK)';
+                    }
                 }
             }
         }
@@ -275,7 +292,12 @@ function displayResults(data) {
     // Create charts
     createEquityCurveChart('equity-chart', data.chart_data);
     createDrawdownChart('drawdown-chart', data.chart_data);
-    createMonthlyReturnsChart('monthly-returns-chart', data.chart_data);
+    
+    // Use annual returns chart instead of monthly returns
+    createAnnualReturnsChart('returns-chart', data.chart_data);
+    
+    // Update chart tab labels
+    document.getElementById('returns-tab-label').textContent = 'Annual Returns';
     
     // Scroll to results
     document.getElementById('results-container').scrollIntoView({
@@ -287,6 +309,12 @@ function displayResults(data) {
  * Display metrics in the metrics table
  */
 function displayMetrics(portfolioMetrics, benchmarkMetrics) {
+    // Make sure all value cells are right-aligned
+    const allValueCells = document.querySelectorAll('.metrics-table td.value-cell');
+    allValueCells.forEach(cell => {
+        cell.classList.add('text-end');
+    });
+    
     // Portfolio metrics
     document.getElementById('cagr-value').textContent = portfolioMetrics.cagr;
     document.getElementById('volatility-value').textContent = portfolioMetrics.volatility;

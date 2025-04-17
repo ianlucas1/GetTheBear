@@ -28,13 +28,16 @@ function createEquityCurveChart(elementId, data) {
     
     // Add benchmark trace if available
     if (data.benchmark_values) {
+        // Get the benchmark ticker name
+        const benchmarkTicker = data.benchmark_ticker || 'SPY';
+        
         // Separate benchmark data
         const benchmarkTrace = {
             x: dates,
             y: data.benchmark_values,
             type: 'scatter',
             mode: 'lines',
-            name: 'Benchmark (SPY)',
+            name: `Benchmark (${benchmarkTicker})`,
             line: {
                 color: '#6554C0', // Different color for benchmark
                 width: 2,
@@ -133,13 +136,16 @@ function createDrawdownChart(elementId, data) {
     if (data.benchmark_drawdowns) {
         const benchmarkDrawdowns = data.benchmark_drawdowns.map(d => d * 100); // Convert to percentage
         
+        // Get the benchmark ticker name
+        const benchmarkTicker = data.benchmark_ticker || 'SPY';
+        
         // Benchmark trace
         const benchmarkTrace = {
             x: dates,
             y: benchmarkDrawdowns,
             type: 'scatter',
             mode: 'lines',
-            name: 'Benchmark Drawdown',
+            name: `${benchmarkTicker} Drawdown`,
             line: {
                 color: '#6554C0',
                 width: 2,
@@ -257,12 +263,15 @@ function createAnnualReturnsChart(elementId, data) {
             return benchmarkAnnualReturnsData[year] ? benchmarkAnnualReturnsData[year] * 100 : null;
         });
         
+        // Get the benchmark ticker name
+        const benchmarkTicker = data.benchmark_ticker || 'SPY';
+        
         // Benchmark trace
         const benchmarkTrace = {
             x: years,
             y: benchmarkReturns,
             type: 'bar',
-            name: 'Benchmark (SPY)',
+            name: `Benchmark (${benchmarkTicker})`,
             marker: {
                 color: '#6554C0'
             },

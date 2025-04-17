@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize application
     initializeDatePicker();
     setupTickerControls();
+    setupBenchmarkControl();
     setupAnalysisForm();
 });
 
@@ -83,6 +84,26 @@ function addTickerRow() {
     `;
     
     tickerInputsContainer.appendChild(tickerRow);
+}
+
+/**
+ * Setup benchmark dropdown selector
+ */
+function setupBenchmarkControl() {
+    const benchmarkSelect = document.getElementById('benchmark-select');
+    const customBenchmarkInput = document.getElementById('custom-benchmark');
+    
+    // Handle switching between dropdown and custom input
+    benchmarkSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            customBenchmarkInput.style.display = 'block';
+            customBenchmarkInput.focus();
+            customBenchmarkInput.required = true;
+        } else {
+            customBenchmarkInput.style.display = 'none';
+            customBenchmarkInput.required = false;
+        }
+    });
 }
 
 /**
@@ -201,7 +222,6 @@ function getFormData() {
     
     // Get ticker symbols and weights
     const tickerRows = document.querySelectorAll('.ticker-item');
-    let spyFound = false;
     
     tickerRows.forEach(row => {
         let ticker = row.querySelector('.ticker-input').value.trim().toUpperCase();
@@ -210,12 +230,6 @@ function getFormData() {
         // If the ticker contains a benchmark label, clean it up
         if (ticker.includes(' (BENCHMARK)')) {
             ticker = ticker.replace(' (BENCHMARK)', '');
-        }
-        
-        // Check if this is SPY, and if so, mark it as a benchmark
-        if (ticker === 'SPY' && !spyFound) {
-            ticker = 'SPY (BENCHMARK)';
-            spyFound = true;
         }
         
         if (ticker && !isNaN(weight) && weight > 0) {
@@ -244,11 +258,26 @@ function getFormData() {
         return null;
     }
     
+    // Get benchmark ticker
+    let benchmarkTicker;
+    const benchmarkSelect = document.getElementById('benchmark-select');
+    
+    if (benchmarkSelect.value === 'custom') {
+        benchmarkTicker = document.getElementById('custom-benchmark').value.trim().toUpperCase();
+        if (!benchmarkTicker) {
+            showError('Please enter a custom benchmark ticker');
+            return null;
+        }
+    } else {
+        benchmarkTicker = benchmarkSelect.value;
+    }
+    
     return {
         tickers: tickers,
         weights: weights,
         start_date: startDate,
-        end_date: endDate
+        end_date: endDate,
+        benchmark_ticker: benchmarkTicker
     };
 }
 
@@ -262,25 +291,34 @@ function displayResults(data) {
     // Enable download button
     document.getElementById('download-returns-btn').disabled = false;
     
+    // Get the benchmark ticker name to display
+    const benchmarkTicker = data.chart_data.benchmark_ticker || 'SPY';
+    
+    // Update benchmark header in the metrics table
+    document.getElementById('benchmark-header').textContent = `Benchmark (${benchmarkTicker})`;
+
     // Display metrics for portfolio and benchmark
     displayMetrics(data.metrics, data.benchmark_metrics);
     
     // Handle the benchmark in portfolio notice
     const benchmarkNotice = document.getElementById('benchmark-in-portfolio-notice');
+    const benchmarkNameNotice = document.getElementById('benchmark-name-notice');
+    
     if (data.chart_data.benchmark_in_portfolio) {
+        // Update the notice text with the benchmark ticker
+        benchmarkNameNotice.textContent = benchmarkTicker;
         benchmarkNotice.style.display = 'block';
-        benchmarkNotice.textContent = 'Note: SPY is included in your portfolio and used as the benchmark.';
         
-        // Add "(Benchmark)" label to ticker
+        // Add "(Benchmark)" label to ticker in the portfolio
         if (data.chart_data.benchmark_index >= 0) {
             const tickerRows = document.querySelectorAll('.ticker-item');
             if (tickerRows.length > data.chart_data.benchmark_index) {
                 const benchmarkRow = tickerRows[data.chart_data.benchmark_index];
                 const tickerInput = benchmarkRow.querySelector('.ticker-input');
-                if (tickerInput && tickerInput.value.toUpperCase().includes('SPY')) {
+                if (tickerInput) {
                     // Make sure we don't add the label multiple times
                     if (!tickerInput.value.includes('(BENCHMARK)')) {
-                        tickerInput.value = 'SPY (BENCHMARK)';
+                        tickerInput.value = `${tickerInput.value.toUpperCase()} (BENCHMARK)`;
                     }
                 }
             }
@@ -295,9 +333,6 @@ function displayResults(data) {
     
     // Use annual returns chart instead of monthly returns
     createAnnualReturnsChart('returns-chart', data.chart_data);
-    
-    // Update chart tab labels
-    document.getElementById('returns-tab-label').textContent = 'Annual Returns';
     
     // Scroll to results
     document.getElementById('results-container').scrollIntoView({
@@ -384,7 +419,7 @@ function colorizeValue(elementId, value) {
 }
 
 /**
- * Download monthly returns CSV
+ * Download returns CSV with portfolio and benchmark data
  */
 function downloadReturns() {
     showLoading(true);
@@ -398,14 +433,20 @@ function downloadReturns() {
         return;
     }
     
+    // Get the benchmark ticker
+    const benchmarkTicker = formData.benchmark_ticker;
+    
     // Construct URL with query parameters
-    const url = `/download_returns?tickers=${formData.tickers.join(',')}&weights=${formData.weights.join(',')}&start_date=${formData.start_date}&end_date=${formData.end_date}`;
+    const url = `/download_returns?tickers=${formData.tickers.join(',')}&weights=${formData.weights.join(',')}&start_date=${formData.start_date}&end_date=${formData.end_date}&benchmark_ticker=${benchmarkTicker}`;
+    
+    // Create filename with benchmark ticker
+    const filename = `portfolio_vs_${benchmarkTicker}_returns.csv`;
     
     // Create temporary link to download the file
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
-    link.download = 'portfolio_returns.csv';
+    link.download = filename;
     
     // Append to document, click, and remove
     document.body.appendChild(link);

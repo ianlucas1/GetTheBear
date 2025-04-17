@@ -1,0 +1,124 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<!-- Portfolio Input Section -->
+<section class="section">
+    <h2 class="section-title">Portfolio Setup</h2>
+    <div class="error-message" id="error-message"></div>
+    
+    <form id="analysis-form">
+        <!-- Date Range Selection -->
+        <div class="form-group" style="display: flex; gap: 20px;">
+            <div style="flex: 1;">
+                <label for="start-date">Start Date</label>
+                <input type="date" id="start-date" name="start-date" required>
+            </div>
+            <div style="flex: 1;">
+                <label for="end-date">End Date</label>
+                <input type="date" id="end-date" name="end-date" required>
+            </div>
+        </div>
+        
+        <!-- Portfolio Tickers -->
+        <div class="form-group">
+            <label>Portfolio Securities</label>
+            <div id="ticker-inputs" class="ticker-inputs">
+                <!-- Ticker inputs will be added here dynamically -->
+            </div>
+            <button type="button" id="add-ticker" class="btn btn-secondary">Add Ticker</button>
+        </div>
+        
+        <!-- Analysis Button -->
+        <div class="form-group" style="margin-top: 20px;">
+            <button type="submit" id="analyze-btn" class="btn btn-primary">Analyze Portfolio</button>
+        </div>
+    </form>
+    
+    <!-- Loading Indicator -->
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <p>Retrieving data and analyzing portfolio...</p>
+    </div>
+</section>
+
+<!-- Results Section -->
+<section id="results-container" class="section results-container">
+    <h2 class="section-title">Portfolio Analysis Results</h2>
+    
+    <!-- Metrics Summary -->
+    <div class="metrics-container">
+        <div class="metric-card">
+            <div class="metric-title">CAGR</div>
+            <div class="metric-value" id="cagr-value">--</div>
+            <div class="metric-desc">Compound Annual Growth Rate</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">VOLATILITY</div>
+            <div class="metric-value" id="volatility-value">--</div>
+            <div class="metric-desc">Annualized Standard Deviation</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">SHARPE RATIO</div>
+            <div class="metric-value" id="sharpe-value">--</div>
+            <div class="metric-desc">Risk-Adjusted Return</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">MAX DRAWDOWN</div>
+            <div class="metric-value" id="max-drawdown-value">--</div>
+            <div class="metric-desc">Largest Peak-to-Trough Decline</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">BEST MONTH</div>
+            <div class="metric-value" id="best-month-value">--</div>
+            <div class="metric-desc">Highest Monthly Return</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">WORST MONTH</div>
+            <div class="metric-value" id="worst-month-value">--</div>
+            <div class="metric-desc">Lowest Monthly Return</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">TOTAL RETURN</div>
+            <div class="metric-value" id="total-return-value">--</div>
+            <div class="metric-desc">Overall Gain/Loss</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-title">TIME PERIOD</div>
+            <div class="metric-value" id="period-value">--</div>
+            <div class="metric-desc">Analysis Timeframe</div>
+        </div>
+    </div>
+    
+    <!-- Download Results Button -->
+    <div style="margin: 20px 0;">
+        <button id="download-returns-btn" class="btn btn-success" disabled>Download Monthly Returns (CSV)</button>
+    </div>
+    
+    <!-- Chart Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="equity-curve-tab">Equity Curve</div>
+        <div class="tab" data-tab="drawdown-tab">Drawdown</div>
+        <div class="tab" data-tab="monthly-returns-tab">Monthly Returns</div>
+    </div>
+    
+    <!-- Chart Containers -->
+    <div id="equity-curve-tab" class="tab-content active">
+        <div id="equity-chart" class="chart-container"></div>
+    </div>
+    
+    <div id="drawdown-tab" class="tab-content">
+        <div id="drawdown-chart" class="chart-container"></div>
+    </div>
+    
+    <div id="monthly-returns-tab" class="tab-content">
+        <div id="monthly-returns-chart" class="chart-container"></div>
+    </div>
+</section>
+{% endblock %}

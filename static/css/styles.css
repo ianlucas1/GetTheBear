@@ -1,0 +1,336 @@
+/* Get the Bear - Portfolio Analysis Tool
+ * Main Stylesheet
+ */
+
+/* Root Variables and Fonts */
+:root {
+  --primary: #0052CC;    /* Finance blue */
+  --secondary: #00875A;  /* Positive green */
+  --accent: #DE350B;     /* Negative red */
+  --background: #FFFFFF; /* White */
+  --text: #172B4D;       /* Dark blue-grey */
+  --light-gray: #F4F5F7;
+  --border: #DFE1E6;
+  --hover: #E6EFFC;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+/* Base Styles */
+body {
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
+  background-color: var(--background);
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+}
+
+.mono {
+  font-family: 'Roboto Mono', monospace;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  font-weight: 600;
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+header {
+  background-color: var(--primary);
+  color: white;
+  padding: 20px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.app-description {
+  font-size: 14px;
+  max-width: 400px;
+}
+
+main {
+  padding: 30px 0;
+}
+
+/* Form Elements */
+.section {
+  margin-bottom: 30px;
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.section-title {
+  font-size: 20px;
+  margin-bottom: 15px;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.section-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background-color: var(--primary);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.input-group input {
+  flex: 1;
+}
+
+.ticker-inputs {
+  margin-bottom: 15px;
+}
+
+.ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: var(--light-gray);
+  border-radius: 4px;
+}
+
+.ticker-symbol {
+  flex: 2;
+}
+
+.ticker-weight {
+  flex: 1;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0044AA;
+}
+
+.btn-secondary {
+  background-color: var(--light-gray);
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  background-color: #E1E4E9;
+}
+
+.btn-success {
+  background-color: var(--secondary);
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #007249;
+}
+
+.btn-danger {
+  background-color: var(--accent);
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #C02D09;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+/* Charts and Results */
+.chart-container {
+  height: 400px;
+  margin-bottom: 30px;
+}
+
+.metrics-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.metric-card {
+  background-color: var(--light-gray);
+  padding: 15px;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 10px 0;
+}
+
+.metric-title {
+  font-size: 14px;
+  color: #5E6C84;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.positive {
+  color: var(--secondary);
+}
+
+.negative {
+  color: var(--accent);
+}
+
+/* Loading Animation */
+.loader {
+  display: none;
+  text-align: center;
+  padding: 20px;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: var(--primary);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Error Message */
+.error-message {
+  color: var(--accent);
+  background-color: #FFE9E6;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  display: none;
+}
+
+/* Results Section */
+.results-container {
+  display: none;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.tab.active {
+  border-bottom-color: var(--primary);
+  font-weight: 500;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .metrics-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .chart-container {
+    height: 300px;
+  }
+}
+
+@media (max-width: 576px) {
+  .metrics-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .app-description {
+    margin-top: 10px;
+  }
+  
+  .chart-container {
+    height: 250px;
+  }
+}

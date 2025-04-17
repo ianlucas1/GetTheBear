@@ -255,8 +255,14 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         # Explicitly specify fill_method=None to address FutureWarning
         monthly_returns = df.pct_change(fill_method=None).dropna()
         
+        # Store individual ticker returns in a separate DataFrame
+        df_ticker_returns = pd.DataFrame(index=monthly_returns.index)
+        for ticker in clean_tickers:
+            if ticker in monthly_returns.columns:
+                df_ticker_returns[ticker] = monthly_returns[ticker]
+        
         # Compute correlation matrix between ticker returns
-        correlation_matrix = monthly_returns.corr().round(2)
+        correlation_matrix = df_ticker_returns.corr().round(2)
         
         # Calculate portfolio monthly returns using weights
         portfolio_monthly_returns = pd.Series(0, index=monthly_returns.index)

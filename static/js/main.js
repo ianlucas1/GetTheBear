@@ -62,6 +62,13 @@ function setupTickerControls() {
             }
         }
     });
+    
+    // Add auto-uppercase functionality to all ticker inputs (both existing and future ones)
+    tickerInputsContainer.addEventListener('blur', function(e) {
+        if (e.target.classList.contains('ticker-input')) {
+            e.target.value = e.target.value.toUpperCase();
+        }
+    }, true);
 }
 
 /**
@@ -84,6 +91,12 @@ function addTickerRow() {
     `;
     
     tickerInputsContainer.appendChild(tickerRow);
+    
+    // Add auto-uppercase functionality to the newly added ticker input
+    const tickerInput = tickerRow.querySelector('.ticker-input');
+    tickerInput.addEventListener('blur', function() {
+        this.value = this.value.toUpperCase();
+    });
 }
 
 /**
@@ -103,6 +116,11 @@ function setupBenchmarkControl() {
             customBenchmarkInput.style.display = 'none';
             customBenchmarkInput.required = false;
         }
+    });
+    
+    // Add auto-uppercase functionality to custom benchmark input
+    customBenchmarkInput.addEventListener('blur', function() {
+        this.value = this.value.toUpperCase();
     });
 }
 

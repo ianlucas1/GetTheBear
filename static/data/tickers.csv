@@ -1,0 +1,93 @@
+ticker,name
+SPY,SPDR S&P 500 ETF Trust
+VOO,Vanguard S&P 500 ETF
+QQQ,Invesco QQQ Trust Series 1
+VTI,Vanguard Total Stock Market ETF
+AAPL,Apple Inc.
+MSFT,Microsoft Corporation
+AMZN,Amazon.com Inc.
+GOOG,Alphabet Inc. Class C
+GOOGL,Alphabet Inc. Class A
+META,Meta Platforms Inc.
+TSLA,Tesla Inc.
+BRK.A,Berkshire Hathaway Inc. Class A
+BRK.B,Berkshire Hathaway Inc. Class B
+JNJ,Johnson & Johnson
+UNH,UnitedHealth Group Inc.
+V,Visa Inc.
+PG,Procter & Gamble Co.
+XLK,Technology Select Sector SPDR Fund
+XLV,Health Care Select Sector SPDR Fund
+XLF,Financial Select Sector SPDR Fund
+XLC,Communication Services Select Sector SPDR Fund
+XLY,Consumer Discretionary Select Sector SPDR Fund
+XLP,Consumer Staples Select Sector SPDR Fund
+XLI,Industrial Select Sector SPDR Fund
+XLU,Utilities Select Sector SPDR Fund
+XLE,Energy Select Sector SPDR Fund
+XLRE,Real Estate Select Sector SPDR Fund
+XLB,Materials Select Sector SPDR Fund
+VEA,Vanguard FTSE Developed Markets ETF
+VWO,Vanguard FTSE Emerging Markets ETF
+IEFA,iShares Core MSCI EAFE ETF
+IEMG,iShares Core MSCI Emerging Markets ETF
+EFA,iShares MSCI EAFE ETF
+EEM,iShares MSCI Emerging Markets ETF
+BNDX,Vanguard Total International Bond ETF
+AGG,iShares Core U.S. Aggregate Bond ETF
+BND,Vanguard Total Bond Market ETF
+LQD,iShares iBoxx $ Investment Grade Corporate Bond ETF
+TLT,iShares 20+ Year Treasury Bond ETF
+IEF,iShares 7-10 Year Treasury Bond ETF
+SHY,iShares 1-3 Year Treasury Bond ETF
+TIP,iShares TIPS Bond ETF
+MUB,iShares National Muni Bond ETF
+HYG,iShares iBoxx $ High Yield Corporate Bond ETF
+VNQ,Vanguard Real Estate ETF
+GLD,SPDR Gold Shares
+IAU,iShares Gold Trust
+USO,United States Oil Fund LP
+TIPS,iShares TIPS Bond ETF
+SHV,iShares Short Treasury Bond ETF
+VV,Vanguard Large-Cap ETF
+VO,Vanguard Mid-Cap ETF
+VB,Vanguard Small-Cap ETF
+VUG,Vanguard Growth ETF
+VTV,Vanguard Value ETF
+VYM,Vanguard High Dividend Yield ETF
+VIG,Vanguard Dividend Appreciation ETF
+VXUS,Vanguard Total International Stock ETF
+SCHD,Schwab US Dividend Equity ETF
+SCHX,Schwab US Large-Cap ETF
+SCHB,Schwab US Broad Market ETF
+IVV,iShares Core S&P 500 ETF
+IJH,iShares Core S&P Mid-Cap ETF
+IJR,iShares Core S&P Small-Cap ETF
+IWF,iShares Russell 1000 Growth ETF
+IWD,iShares Russell 1000 Value ETF
+IWM,iShares Russell 2000 ETF
+AOA,iShares Core Aggressive Allocation ETF
+AOR,iShares Core Growth Allocation ETF
+AOM,iShares Core Moderate Allocation ETF
+AOK,iShares Core Conservative Allocation ETF
+VT,Vanguard Total World Stock ETF
+INTC,Intel Corporation
+NVDA,NVIDIA Corporation
+AMD,Advanced Micro Devices Inc.
+JPM,JPMorgan Chase & Co.
+BAC,Bank of America Corp
+C,Citigroup Inc.
+WFC,Wells Fargo & Co.
+GS,Goldman Sachs Group Inc.
+MS,Morgan Stanley
+PFE,Pfizer Inc.
+MRK,Merck & Co. Inc.
+ABT,Abbott Laboratories
+ABBV,AbbVie Inc.
+KO,Coca-Cola Co.
+PEP,PepsiCo Inc.
+HD,Home Depot Inc.
+COST,Costco Wholesale Corporation
+WMT,Walmart Inc.
+AMGN,Amgen Inc.
+TMO,Thermo Fisher Scientific Inc.

@@ -84,7 +84,7 @@ def analyze_portfolio():
         logger.debug(f"Using benchmark: {benchmark_ticker}")
         
         # Fetch portfolio data
-        df_monthly, error_tickers = fetch_portfolio_data(tickers, weights, start_date, end_date)
+        df_monthly, error_tickers, correlation_data = fetch_portfolio_data(tickers, weights, start_date, end_date)
         
         if error_tickers:
             return jsonify({
@@ -111,7 +111,7 @@ def analyze_portfolio():
         if benchmark_in_portfolio:
             # Create a separate dataframe for the benchmark using just that ticker's price data
             clean_ticker = tickers[benchmark_index].split(" (")[0]
-            benchmark_only_data, _ = fetch_portfolio_data([clean_ticker], [1.0], start_date, end_date)
+            benchmark_only_data, _, _ = fetch_portfolio_data([clean_ticker], [1.0], start_date, end_date)
             if benchmark_only_data is not None and not benchmark_only_data.empty:
                 benchmark_metrics = calculate_metrics(benchmark_only_data)
         elif df_benchmark is not None and not df_benchmark.empty:
@@ -153,6 +153,7 @@ def analyze_portfolio():
             "metrics": metrics,
             "benchmark_metrics": benchmark_metrics,
             "chart_data": chart_data,
+            "correlation_matrix": correlation_data,
             "success": True
         })
     
@@ -211,7 +212,7 @@ def download_returns():
                 break
         
         # Fetch portfolio data
-        df_portfolio, error_tickers = fetch_portfolio_data(tickers, weights, start_date, end_date)
+        df_portfolio, error_tickers, _ = fetch_portfolio_data(tickers, weights, start_date, end_date)
         
         if error_tickers:
             logger.warning(f"Could not fetch data for: {error_tickers}")
@@ -238,7 +239,7 @@ def download_returns():
             for i, ticker in enumerate(tickers):
                 clean_ticker = ticker.split(" (")[0].strip().upper()
                 if clean_ticker == benchmark_ticker:
-                    benchmark_only_data, _ = fetch_portfolio_data([clean_ticker], [1.0], start_date, end_date)
+                    benchmark_only_data, _, _ = fetch_portfolio_data([clean_ticker], [1.0], start_date, end_date)
                     if benchmark_only_data is not None and not benchmark_only_data.empty:
                         benchmark_data = benchmark_only_data
                     break

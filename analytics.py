@@ -255,6 +255,9 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         # Explicitly specify fill_method=None to address FutureWarning
         monthly_returns = df.pct_change(fill_method=None).dropna()
         
+        # Compute correlation matrix between ticker returns
+        correlation_matrix = monthly_returns.corr().round(2)
+        
         # Calculate portfolio monthly returns using weights
         portfolio_monthly_returns = pd.Series(0, index=monthly_returns.index)
         for ticker, weight in weight_dict.items():
@@ -273,11 +276,17 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         # Keep annual return data for charts
         df_portfolio['Year'] = df_portfolio.index.year
         
-        return df_portfolio, error_tickers
+        # Convert correlation matrix to nested dictionary format for JSON
+        correlation_data = {
+            'tickers': list(correlation_matrix.index),
+            'matrix': correlation_matrix.values.tolist()
+        }
+        
+        return df_portfolio, error_tickers, correlation_data
         
     except Exception as e:
         logger.exception(f"Error fetching portfolio data: {str(e)}")
-        return None, tickers
+        return None, tickers, None
 
 def calculate_metrics(df_portfolio, is_benchmark=False):
     """

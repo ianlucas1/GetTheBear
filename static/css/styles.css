@@ -152,28 +152,55 @@ select {
 /* Weight controls styling */
 .weights-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 15px;
-  margin-top: 15px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  max-width: 450px;
 }
 
-.weight-total {
-  flex: 1;
+@media (max-width: 768px) {
+  .weights-controls {
+    width: 100%;
+  }
+}
+
+.weight-pill {
+  font-size: 14px;
+  font-weight: 600;
   padding: 8px 12px;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: 6px;
   font-family: 'Roboto Mono', monospace;
-  background-color: var(--light-gray);
+  background-color: #F0F0F0;
+  display: inline-block;
 }
 
-.weight-total.valid {
+.weight-pill.valid {
   color: var(--secondary);
   background-color: rgba(0, 135, 90, 0.1);
 }
 
-.weight-total.invalid {
+.weight-pill.invalid {
   color: var(--accent);
   background-color: rgba(222, 53, 11, 0.1);
+}
+
+/* Add outline button style */
+.btn-outline {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  padding: 9px 15px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline:hover {
+  background-color: rgba(0, 82, 204, 0.1);
 }
 
 /* Buttons */

@@ -279,6 +279,17 @@ select {
   display: none;
 }
 
+/* Metrics Table */
+.metrics-table td.value-cell {
+  text-align: right;
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 500;
+}
+
+.text-end {
+  text-align: right !important;
+}
+
 /* Tabs */
 .tabs {
   display: flex;

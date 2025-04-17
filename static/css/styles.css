@@ -203,8 +203,18 @@ select {
 
 /* Charts and Results */
 .chart-container {
-  height: 400px;
+  height: 450px;  /* Increased height for better visualization */
   margin-bottom: 30px;
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+}
+
+/* Add hover effect to chart containers */
+.chart-container:hover {
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
 }
 
 .metrics-container {
@@ -426,7 +436,31 @@ select {
   }
   
   .chart-container {
-    height: 300px;
+    height: 350px;
+    padding: 10px;
+    margin-bottom: 25px;
+  }
+  
+  .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  
+  .allocation-legend-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  }
+  
+  /* Better tooltips for touch devices */
+  .hoverlabel {
+    padding: 10px !important;
+    font-size: 14px !important;
   }
 }
 
@@ -445,6 +479,32 @@ select {
   }
   
   .chart-container {
-    height: 250px;
+    height: 300px;
+    padding: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .allocation-legend-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  
+  /* Adjust legend items for small screens */
+  .legend-item {
+    padding: 8px !important;
+  }
+  
+  .legend-ticker {
+    font-size: 14px !important;
+  }
+  
+  .legend-weight {
+    font-size: 12px !important;
+  }
+  
+  /* Make tab labels more compact on small screens */
+  .tab {
+    padding: 8px 12px;
+    font-size: 13px;
   }
 }

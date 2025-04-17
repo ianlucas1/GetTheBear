@@ -7,7 +7,7 @@
  * Create allocation pie chart using Plotly
  */
 function createAllocationChart(elementId, legendId, tickers, weights) {
-    // Generate a palette of colors for the different tickers
+    // Generate a beautiful palette of colors with better visual distinction
     const colors = [
         '#0052CC', // Primary blue
         '#00875A', // Green
@@ -31,45 +31,84 @@ function createAllocationChart(elementId, legendId, tickers, weights) {
         colors.push(...colors);
     }
     
-    // Format weights as percentages for display
-    const formattedWeights = weights.map(w => (w * 100).toFixed(1) + '%');
+    // Calculate percentage values for the hover text
+    const percentValues = weights.map(w => (w * 100).toFixed(2) + '%');
     
-    // Create the pie chart trace
+    // Format weights as percentages for display (with plus sign for positive values)
+    const formattedWeights = weights.map(w => {
+        const value = (w * 100).toFixed(1);
+        return value + '%';
+    });
+    
+    // Create hover text with both ticker name and percentage
+    const hoverTexts = tickers.map((ticker, index) => {
+        return `${ticker}: ${percentValues[index]}`;
+    });
+    
+    // Create the pie chart trace with enhanced styling
     const trace = {
         type: 'pie',
         labels: tickers,
         values: weights,
+        text: hoverTexts,
         textinfo: 'label+percent',
-        textposition: 'inside',
+        textposition: 'auto',
+        insidetextfont: {
+            family: 'Inter, sans-serif',
+            size: 12,
+            color: '#FFFFFF'
+        },
+        outsidetextfont: {
+            family: 'Inter, sans-serif',
+            size: 12,
+            color: '#172B4D'
+        },
         automargin: true,
         marker: {
             colors: colors,
             line: {
                 color: '#FFFFFF',
-                width: 2
+                width: 2.5  // Slightly thicker border for better definition
+            },
+            pattern: {
+                shape: ''  // No pattern
             }
         },
-        hoverinfo: 'label+percent+value',
+        hoverinfo: 'text',
+        hovertemplate: '<b>%{label}</b><br>%{percent}<extra></extra>',  // Enhanced tooltip
         hoverlabel: {
-            bgcolor: '#FFF',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
             font: {
                 family: 'Roboto Mono, monospace',
                 size: 12,
                 color: '#172B4D'
             },
-            bordercolor: '#DFE1E6'
-        }
+            bordercolor: '#DFE1E6',
+            borderwidth: 1
+        },
+        hole: 0.4  // Create a donut chart for more modern look
     };
     
     const layout = {
-        title: 'Portfolio Allocation',
+        title: {
+            text: 'Portfolio Allocation',
+            font: {
+                family: 'Inter, sans-serif',
+                size: 20,
+                color: '#172B4D'
+            },
+            xref: 'paper',
+            x: 0.5,  // Center the title
+            y: 0.97,
+            pad: {t: 10}
+        },
         height: 500,
-        showlegend: false,
+        showlegend: false,  // We'll use custom legend
         margin: {
-            l: 0,
-            r: 0,
-            t: 50,
-            b: 0
+            l: 10,
+            r: 10,
+            t: 70,
+            b: 10
         },
         plot_bgcolor: '#FFF',
         paper_bgcolor: '#FFF',
@@ -77,45 +116,101 @@ function createAllocationChart(elementId, legendId, tickers, weights) {
             family: 'Inter, sans-serif',
             size: 12,
             color: '#172B4D'
-        }
+        },
+        annotations: [{
+            text: 'Asset<br>Allocation',
+            showarrow: false,
+            font: {
+                family: 'Inter, sans-serif',
+                size: 14,
+                color: '#172B4D'
+            }
+        }]
     };
     
     const config = {
         responsive: true,
         displayModeBar: true,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-        displaylogo: false
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'portfolio_allocation',
+            height: 600,
+            width: 800,
+            scale: 2
+        }
     };
     
     Plotly.newPlot(elementId, [trace], layout, config);
     
-    // Create custom legend with weights
+    // Create enhanced custom legend with weights
     const legendContainer = document.getElementById(legendId);
     if (legendContainer) {
         legendContainer.innerHTML = ''; // Clear existing content
         
+        // Create a more structured and attractive legend
+        const legendGrid = document.createElement('div');
+        legendGrid.className = 'allocation-legend-grid';
+        legendGrid.style.display = 'grid';
+        legendGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))';
+        legendGrid.style.gap = '12px';
+        legendGrid.style.width = '100%';
+        legendGrid.style.marginTop = '20px';
+        
         tickers.forEach((ticker, index) => {
             const legendItem = document.createElement('div');
             legendItem.className = 'legend-item';
+            legendItem.style.display = 'flex';
+            legendItem.style.alignItems = 'center';
+            legendItem.style.padding = '8px 12px';
+            legendItem.style.backgroundColor = 'rgba(244, 245, 247, 0.5)';
+            legendItem.style.borderRadius = '6px';
+            legendItem.style.border = '1px solid #DFE1E6';
+            legendItem.style.transition = 'all 0.2s ease';
+            
+            // Add hover effect
+            legendItem.onmouseover = function() {
+                this.style.backgroundColor = 'rgba(244, 245, 247, 0.9)';
+                this.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+            };
+            legendItem.onmouseout = function() {
+                this.style.backgroundColor = 'rgba(244, 245, 247, 0.5)';
+                this.style.boxShadow = 'none';
+            };
             
             const colorBox = document.createElement('span');
             colorBox.className = 'legend-color';
+            colorBox.style.width = '16px';
+            colorBox.style.height = '16px';
+            colorBox.style.borderRadius = '4px';
+            colorBox.style.marginRight = '8px';
             colorBox.style.backgroundColor = colors[index % colors.length];
+            colorBox.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
             
             const tickerSpan = document.createElement('span');
             tickerSpan.className = 'legend-ticker';
+            tickerSpan.style.fontWeight = '600';
+            tickerSpan.style.marginRight = '8px';
+            tickerSpan.style.color = '#172B4D';
             tickerSpan.textContent = ticker;
             
             const weightSpan = document.createElement('span');
             weightSpan.className = 'legend-weight';
+            weightSpan.style.marginLeft = 'auto';
+            weightSpan.style.fontFamily = 'Roboto Mono, monospace';
+            weightSpan.style.color = '#5E6C84';
+            weightSpan.style.fontSize = '14px';
             weightSpan.textContent = formattedWeights[index];
             
             legendItem.appendChild(colorBox);
             legendItem.appendChild(tickerSpan);
             legendItem.appendChild(weightSpan);
             
-            legendContainer.appendChild(legendItem);
+            legendGrid.appendChild(legendItem);
         });
+        
+        legendContainer.appendChild(legendGrid);
     }
 }
 
@@ -126,23 +221,36 @@ function createEquityCurveChart(elementId, data) {
     const dates = data.dates;
     const portfolioValues = data.portfolio_values;
     
-    // Portfolio trace
+    // Portfolio trace with enhanced styling
     const portfolioTrace = {
         x: dates,
         y: portfolioValues,
         type: 'scatter',
-        mode: 'lines',
+        mode: 'lines+markers',  // Add markers to show data points
         name: 'Portfolio Value',
         line: {
             color: '#0052CC',
-            width: 2
-        }
+            width: 3,  // Thicker line for better visibility
+            shape: 'spline'  // Smoother curve
+        },
+        marker: {
+            size: 6,  // Marker size
+            color: '#0052CC',
+            line: {
+                color: '#FFF',
+                width: 1
+            },
+            symbol: 'circle',
+            opacity: 0.8
+        },
+        hoverinfo: 'x+y+name',
+        hovertemplate: '<b>%{y:.2f}</b> on %{x|%b %d, %Y}<extra>Portfolio</extra>'  // Enhanced tooltip
     };
     
     // Array of traces, starting with portfolio
     const traces = [portfolioTrace];
     
-    // Add benchmark trace if available
+    // Add benchmark trace if available with enhanced styling
     if (data.benchmark_values) {
         // Get the benchmark ticker name
         const benchmarkTicker = data.benchmark_ticker || 'SPY';
@@ -152,13 +260,26 @@ function createEquityCurveChart(elementId, data) {
             x: dates,
             y: data.benchmark_values,
             type: 'scatter',
-            mode: 'lines',
+            mode: 'lines+markers',  // Add markers for data points
             name: `Benchmark (${benchmarkTicker})`,
             line: {
-                color: '#6554C0', // Different color for benchmark
-                width: 2,
-                dash: 'dash' // Make it dashed to distinguish
-            }
+                color: '#00875A', // Green/teal for better contrast
+                width: 2.5,
+                dash: 'dot', // Dotted line to distinguish
+                shape: 'spline'  // Smoother curve
+            },
+            marker: {
+                size: 5,  // Slightly smaller markers
+                color: '#00875A',
+                line: {
+                    color: '#FFF',
+                    width: 1
+                },
+                symbol: 'diamond',
+                opacity: 0.7
+            },
+            hoverinfo: 'x+y+name',
+            hovertemplate: '<b>%{y:.2f}</b> on %{x|%b %d, %Y}<extra>' + benchmarkTicker + '</extra>'  // Enhanced tooltip
         };
         traces.push(benchmarkTrace);
     } else if (data.benchmark_in_portfolio) {
@@ -167,39 +288,73 @@ function createEquityCurveChart(elementId, data) {
     }
     
     const layout = {
-        title: 'Portfolio Equity Curve',
+        title: {
+            text: 'Portfolio Equity Curve',
+            font: {
+                family: 'Inter, sans-serif',
+                size: 20,
+                color: '#172B4D'
+            },
+            xref: 'paper',
+            x: 0.5,  // Center the title
+            y: 0.97,
+            pad: {t: 10}
+        },
         xaxis: {
-            title: 'Date',
+            title: {
+                text: 'Date',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: true,
+            gridcolor: 'rgba(233, 236, 239, 0.7)',  // Lighter grid for better readability
+            zeroline: false
         },
         yaxis: {
-            title: 'Value ($)',
+            title: {
+                text: 'Value ($)',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
             tickformat: ',.2f',
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: true,
+            gridcolor: 'rgba(233, 236, 239, 0.7)',  // Lighter grid for better readability
+            zeroline: true,
+            zerolinecolor: '#DFE1E6',
+            zerolinewidth: 1
         },
         hovermode: 'closest',
         hoverlabel: {
-            bgcolor: '#FFF',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
             font: {
                 family: 'Roboto Mono, monospace',
                 size: 12,
                 color: '#172B4D'
             },
-            bordercolor: '#DFE1E6'
+            bordercolor: '#DFE1E6',
+            borderwidth: 1
         },
         margin: {
-            l: 60,
-            r: 30,
-            t: 60,
-            b: 60
+            l: 65,
+            r: 35,
+            t: 70,
+            b: 65
         },
         plot_bgcolor: '#FFF',
         paper_bgcolor: '#FFF',
@@ -210,15 +365,32 @@ function createEquityCurveChart(elementId, data) {
         },
         legend: {
             orientation: 'h',
-            y: -0.15
+            xanchor: 'center',
+            y: -0.15,
+            x: 0.5,
+            bgcolor: 'rgba(255, 255, 255, 0.7)',
+            bordercolor: '#DFE1E6',
+            borderwidth: 1,
+            font: {
+                family: 'Inter, sans-serif',
+                size: 12,
+                color: '#172B4D'
+            }
         }
     };
     
     const config = {
         responsive: true,
         displayModeBar: true,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-        displaylogo: false
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'portfolio_equity_curve',
+            height: 600,
+            width: 1000,
+            scale: 2
+        }
     };
     
     Plotly.newPlot(elementId, traces, layout, config);
@@ -231,83 +403,137 @@ function createDrawdownChart(elementId, data) {
     const dates = data.dates;
     const drawdowns = data.drawdowns.map(d => d * 100); // Convert to percentage
     
-    // Portfolio drawdown trace
+    // Portfolio drawdown trace with enhanced styling
     const portfolioTrace = {
         x: dates,
         y: drawdowns,
         type: 'scatter',
-        mode: 'lines',
+        mode: 'lines+markers',  // Add markers for significant drawdown points
         name: 'Portfolio Drawdown',
         fill: 'tozeroy',
+        fillcolor: 'rgba(222, 53, 11, 0.15)', // Transparent red fill
         line: {
             color: '#DE350B',
-            width: 2
-        }
+            width: 3,
+            shape: 'spline'  // Smoother curve
+        },
+        marker: {
+            size: 4,  // Smaller markers for drawdowns (less cluttered)
+            color: '#DE350B',
+            line: {
+                color: '#FFF',
+                width: 1
+            },
+            symbol: 'circle',
+            opacity: function() {
+                // Only show markers on significant drawdowns
+                return drawdowns.map(d => Math.abs(d) > 5 ? 1 : 0);
+            }()
+        },
+        hoverinfo: 'x+y+name',
+        hovertemplate: '<b>%{y:.2f}%</b> on %{x|%b %d, %Y}<extra>Portfolio Drawdown</extra>'  // Enhanced tooltip
     };
     
     // Array of traces, starting with portfolio
     const traces = [portfolioTrace];
     
-    // Add benchmark trace if available
+    // Add benchmark trace if available with enhanced styling
     if (data.benchmark_drawdowns) {
         const benchmarkDrawdowns = data.benchmark_drawdowns.map(d => d * 100); // Convert to percentage
         
         // Get the benchmark ticker name
         const benchmarkTicker = data.benchmark_ticker || 'SPY';
         
-        // Benchmark trace
+        // Benchmark trace with enhanced styling
         const benchmarkTrace = {
             x: dates,
             y: benchmarkDrawdowns,
             type: 'scatter',
-            mode: 'lines',
+            mode: 'lines',  // Lines only for benchmark to reduce visual clutter
             name: `${benchmarkTicker} Drawdown`,
             line: {
                 color: '#6554C0',
-                width: 2,
-                dash: 'dash'
-            }
+                width: 2.5,
+                dash: 'dot',
+                shape: 'spline'  // Smoother curve
+            },
+            hoverinfo: 'x+y+name',
+            hovertemplate: '<b>%{y:.2f}%</b> on %{x|%b %d, %Y}<extra>' + benchmarkTicker + ' Drawdown</extra>'  // Enhanced tooltip
         };
         
         traces.push(benchmarkTrace);
     }
     
     const layout = {
-        title: 'Portfolio Drawdown',
+        title: {
+            text: 'Portfolio Drawdown',
+            font: {
+                family: 'Inter, sans-serif',
+                size: 20,
+                color: '#172B4D'
+            },
+            xref: 'paper',
+            x: 0.5,  // Center the title
+            y: 0.97,
+            pad: {t: 10}
+        },
         xaxis: {
-            title: 'Date',
+            title: {
+                text: 'Date',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: true,
+            gridcolor: 'rgba(233, 236, 239, 0.7)',  // Lighter grid for better readability
+            zeroline: false
         },
         yaxis: {
-            title: 'Drawdown (%)',
+            title: {
+                text: 'Drawdown (%)',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
             tickformat: ',.1f',
             ticksuffix: '%',
-            rangemode: 'tozero',
+            rangemode: 'tozero',  // Start at zero
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: true,
+            gridcolor: 'rgba(233, 236, 239, 0.7)',  // Lighter grid for better readability
+            zeroline: true,
+            zerolinecolor: '#DFE1E6',
+            zerolinewidth: 1
         },
         hovermode: 'closest',
         hoverlabel: {
-            bgcolor: '#FFF',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
             font: {
                 family: 'Roboto Mono, monospace',
                 size: 12,
                 color: '#172B4D'
             },
-            bordercolor: '#DFE1E6'
+            bordercolor: '#DFE1E6',
+            borderwidth: 1
         },
         margin: {
-            l: 60,
-            r: 30,
-            t: 60,
-            b: 60
+            l: 65,
+            r: 35,
+            t: 70,
+            b: 65
         },
         plot_bgcolor: '#FFF',
         paper_bgcolor: '#FFF',
@@ -318,15 +544,46 @@ function createDrawdownChart(elementId, data) {
         },
         legend: {
             orientation: 'h',
-            y: -0.15
-        }
+            xanchor: 'center',
+            y: -0.15,
+            x: 0.5,
+            bgcolor: 'rgba(255, 255, 255, 0.7)',
+            bordercolor: '#DFE1E6',
+            borderwidth: 1,
+            font: {
+                family: 'Inter, sans-serif',
+                size: 12,
+                color: '#172B4D'
+            }
+        },
+        shapes: [{
+            type: 'line',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            y0: 0,
+            x1: 1,
+            y1: 0,
+            line: {
+                color: 'rgba(66, 66, 66, 0.3)',
+                width: 1.5,
+                dash: 'dot'
+            }
+        }]
     };
     
     const config = {
         responsive: true,
         displayModeBar: true,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-        displaylogo: false
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'portfolio_drawdown',
+            height: 600,
+            width: 1000,
+            scale: 2
+        }
     };
     
     Plotly.newPlot(elementId, traces, layout, config);
@@ -358,82 +615,141 @@ function createAnnualReturnsChart(elementId, data) {
         value >= 0 ? '#00875A' : '#DE350B'
     );
     
-    // Portfolio return trace
+    // Create text values for hover labels with formatted percentages
+    const hoverTexts = annualReturns.map(value => 
+        `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+    );
+    
+    // Portfolio return trace with enhanced styling
     const portfolioTrace = {
         x: years,
         y: annualReturns,
         type: 'bar',
         name: 'Portfolio Return',
+        text: hoverTexts,
+        textposition: 'auto',
+        hoverinfo: 'x+text+name',
+        hovertemplate: '<b>%{text}</b> in %{x}<extra>Portfolio</extra>',
         marker: {
-            color: colors
+            color: colors,
+            line: {
+                color: '#FFFFFF',
+                width: 1.5
+            },
+            opacity: 0.9
         }
     };
     
     // Array of traces, starting with portfolio
     const traces = [portfolioTrace];
     
-    // Add benchmark trace if available
+    // Add benchmark trace if available with enhanced styling
     if (Object.keys(benchmarkAnnualReturnsData).length > 0) {
         // Extract benchmark returns for the same years
         const benchmarkReturns = years.map(year => {
             return benchmarkAnnualReturnsData[year] ? benchmarkAnnualReturnsData[year] * 100 : null;
         });
         
+        // Create text values for hover labels with formatted percentages
+        const benchmarkHoverTexts = benchmarkReturns.map(value => 
+            value !== null ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : 'N/A'
+        );
+        
         // Get the benchmark ticker name
         const benchmarkTicker = data.benchmark_ticker || 'SPY';
         
-        // Benchmark trace
+        // Benchmark trace with enhanced styling
         const benchmarkTrace = {
             x: years,
             y: benchmarkReturns,
             type: 'bar',
             name: `Benchmark (${benchmarkTicker})`,
+            text: benchmarkHoverTexts,
+            textposition: 'auto',
+            hoverinfo: 'x+text+name',
+            hovertemplate: '<b>%{text}</b> in %{x}<extra>' + benchmarkTicker + '</extra>',
             marker: {
-                color: '#6554C0'
-            },
-            opacity: 0.7
+                color: '#6554C0',
+                line: {
+                    color: '#FFFFFF',
+                    width: 1
+                },
+                opacity: 0.7
+            }
         };
         
         traces.push(benchmarkTrace);
     }
     
     const layout = {
-        title: 'Annual Returns',
+        title: {
+            text: 'Annual Returns',
+            font: {
+                family: 'Inter, sans-serif',
+                size: 20,
+                color: '#172B4D'
+            },
+            xref: 'paper',
+            x: 0.5,  // Center the title
+            y: 0.97,
+            pad: {t: 10}
+        },
         xaxis: {
-            title: 'Year',
+            title: {
+                text: 'Year',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
             tickmode: 'array',
             tickvals: years,
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: false
         },
         yaxis: {
-            title: 'Return (%)',
-            tickformat: ',.1f',
+            title: {
+                text: 'Return (%)',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 14,
+                    color: '#172B4D'
+                }
+            },
+            tickformat: '+,.1f',  // Show plus sign for positive values
             ticksuffix: '%',
             tickfont: {
                 family: 'Inter, sans-serif',
                 size: 12,
                 color: '#172B4D'
-            }
+            },
+            showgrid: true,
+            gridcolor: 'rgba(233, 236, 239, 0.7)',  // Lighter grid for better readability
+            zeroline: true,
+            zerolinecolor: '#DFE1E6',
+            zerolinewidth: 2
         },
         hovermode: 'closest',
         hoverlabel: {
-            bgcolor: '#FFF',
+            bgcolor: 'rgba(255, 255, 255, 0.9)',
             font: {
                 family: 'Roboto Mono, monospace',
                 size: 12,
                 color: '#172B4D'
             },
-            bordercolor: '#DFE1E6'
+            bordercolor: '#DFE1E6',
+            borderwidth: 1
         },
         margin: {
-            l: 60,
-            r: 30,
-            t: 60,
-            b: 60
+            l: 65,
+            r: 35,
+            t: 70,
+            b: 65
         },
         plot_bgcolor: '#FFF',
         paper_bgcolor: '#FFF',
@@ -443,17 +759,50 @@ function createAnnualReturnsChart(elementId, data) {
             color: '#172B4D'
         },
         barmode: 'group',
+        bargap: 0.15,
+        bargroupgap: 0.1,
         legend: {
             orientation: 'h',
-            y: -0.15
-        }
+            xanchor: 'center',
+            y: -0.15,
+            x: 0.5,
+            bgcolor: 'rgba(255, 255, 255, 0.7)',
+            bordercolor: '#DFE1E6',
+            borderwidth: 1,
+            font: {
+                family: 'Inter, sans-serif',
+                size: 12,
+                color: '#172B4D'
+            }
+        },
+        shapes: [{
+            type: 'line',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            y0: 0,
+            x1: 1,
+            y1: 0,
+            line: {
+                color: 'rgba(66, 66, 66, 0.3)',
+                width: 1.5,
+                dash: 'dot'
+            }
+        }]
     };
     
     const config = {
         responsive: true,
         displayModeBar: true,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
-        displaylogo: false
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'annual_returns',
+            height: 600,
+            width: 1000,
+            scale: 2
+        }
     };
     
     Plotly.newPlot(elementId, traces, layout, config);

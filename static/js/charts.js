@@ -4,6 +4,122 @@
  */
 
 /**
+ * Create allocation pie chart using Plotly
+ */
+function createAllocationChart(elementId, legendId, tickers, weights) {
+    // Generate a palette of colors for the different tickers
+    const colors = [
+        '#0052CC', // Primary blue
+        '#00875A', // Green
+        '#6554C0', // Purple
+        '#FF5630', // Red
+        '#FFAB00', // Yellow
+        '#36B37E', // Teal
+        '#00B8D9', // Cyan
+        '#6B778C', // Grey
+        '#8777D9', // Light purple
+        '#4C9AFF', // Light blue
+        '#79E2F2', // Light cyan
+        '#67AB9F', // Light teal
+        '#7A869A', // Medium grey
+        '#998DD9', // Medium purple
+        '#C1C7D0', // Light grey
+    ];
+    
+    // Ensure we have enough colors by repeating the palette if needed
+    while (colors.length < tickers.length) {
+        colors.push(...colors);
+    }
+    
+    // Format weights as percentages for display
+    const formattedWeights = weights.map(w => (w * 100).toFixed(1) + '%');
+    
+    // Create the pie chart trace
+    const trace = {
+        type: 'pie',
+        labels: tickers,
+        values: weights,
+        textinfo: 'label+percent',
+        textposition: 'inside',
+        automargin: true,
+        marker: {
+            colors: colors,
+            line: {
+                color: '#FFFFFF',
+                width: 2
+            }
+        },
+        hoverinfo: 'label+percent+value',
+        hoverlabel: {
+            bgcolor: '#FFF',
+            font: {
+                family: 'Roboto Mono, monospace',
+                size: 12,
+                color: '#172B4D'
+            },
+            bordercolor: '#DFE1E6'
+        }
+    };
+    
+    const layout = {
+        title: 'Portfolio Allocation',
+        height: 500,
+        showlegend: false,
+        margin: {
+            l: 0,
+            r: 0,
+            t: 50,
+            b: 0
+        },
+        plot_bgcolor: '#FFF',
+        paper_bgcolor: '#FFF',
+        font: {
+            family: 'Inter, sans-serif',
+            size: 12,
+            color: '#172B4D'
+        }
+    };
+    
+    const config = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        displaylogo: false
+    };
+    
+    Plotly.newPlot(elementId, [trace], layout, config);
+    
+    // Create custom legend with weights
+    const legendContainer = document.getElementById(legendId);
+    if (legendContainer) {
+        legendContainer.innerHTML = ''; // Clear existing content
+        
+        tickers.forEach((ticker, index) => {
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            
+            const colorBox = document.createElement('span');
+            colorBox.className = 'legend-color';
+            colorBox.style.backgroundColor = colors[index % colors.length];
+            
+            const tickerSpan = document.createElement('span');
+            tickerSpan.className = 'legend-ticker';
+            tickerSpan.textContent = ticker;
+            
+            const weightSpan = document.createElement('span');
+            weightSpan.className = 'legend-weight';
+            weightSpan.textContent = formattedWeights[index];
+            
+            legendItem.appendChild(colorBox);
+            legendItem.appendChild(tickerSpan);
+            legendItem.appendChild(weightSpan);
+            
+            legendContainer.appendChild(legendItem);
+        });
+    }
+}
+
+/**
  * Create an equity curve chart using Plotly
  */
 function createEquityCurveChart(elementId, data) {

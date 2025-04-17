@@ -131,13 +131,28 @@
     
     <!-- Chart Tabs -->
     <div class="tabs">
-        <div class="tab active" data-tab="equity-curve-tab">Equity Curve</div>
+        <div class="tab active" data-tab="summary-tab">Summary</div>
+        <div class="tab" data-tab="allocation-tab">Allocation</div>
+        <div class="tab" data-tab="equity-curve-tab">Equity Curve</div>
         <div class="tab" data-tab="drawdown-tab">Drawdown</div>
         <div class="tab" data-tab="returns-tab" id="returns-tab-label">Annual Returns</div>
     </div>
     
     <!-- Chart Containers -->
-    <div id="equity-curve-tab" class="tab-content active">
+    <div id="summary-tab" class="tab-content active">
+        <div class="summary-container">
+            <h3>Portfolio Summary</h3>
+            <p>This tab provides an overview of your portfolio performance. Check other tabs for detailed analysis.</p>
+            <div id="summary-metrics" class="metrics-summary"></div>
+        </div>
+    </div>
+    
+    <div id="allocation-tab" class="tab-content">
+        <div id="allocation-chart" class="chart-container"></div>
+        <div class="allocation-legend" id="allocation-legend"></div>
+    </div>
+    
+    <div id="equity-curve-tab" class="tab-content">
         <div id="equity-chart" class="chart-container"></div>
     </div>
     

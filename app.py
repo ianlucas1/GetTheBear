@@ -228,6 +228,9 @@ def download_returns():
         monthly_returns['Year'] = monthly_returns.index.year
         monthly_returns['Month'] = monthly_returns.index.month
         
+        # Reorder columns to Year | Month | Portfolio_Return | Benchmark_Return
+        column_order = ['Year', 'Month', 'Portfolio_Return']
+        
         # Fetch benchmark data if not already in the portfolio
         benchmark_data = None
         if benchmark_in_portfolio:
@@ -248,6 +251,7 @@ def download_returns():
         # Add benchmark to the monthly returns CSV
         if benchmark_data is not None and not benchmark_data.empty:
             monthly_returns[f'Benchmark_Return'] = benchmark_data['Monthly Return'].reindex(monthly_returns.index).fillna(0)
+            column_order.append('Benchmark_Return')
         
         # Calculate annual returns
         # Group by year and calculate annual returns for portfolio
@@ -295,6 +299,15 @@ def download_returns():
         monthly_returns['Portfolio_Return'] = monthly_returns['Portfolio_Return'] * 100
         if 'Benchmark_Return' in monthly_returns.columns:
             monthly_returns['Benchmark_Return'] = monthly_returns['Benchmark_Return'] * 100
+        
+        # Reorder columns to Year | Month | Portfolio_Return | Benchmark_Return
+        monthly_returns = monthly_returns[column_order]
+        
+        # Reorder annual returns columns as well
+        annual_column_order = ['Year', 'Portfolio_Ann_Return']
+        if 'Benchmark_Ann_Return' in annual_returns.columns:
+            annual_column_order.append('Benchmark_Ann_Return')
+        annual_returns = annual_returns[annual_column_order]
         
         # Create a combined CSV with both monthly and annual data
         # First, the monthly returns

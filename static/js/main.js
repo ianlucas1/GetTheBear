@@ -452,12 +452,33 @@ function displayResults(data) {
         benchmarkNotice.style.display = 'none';
     }
     
+    // Get the original tickers and weights from the form
+    const originalTickers = [];
+    const originalWeights = [];
+    
+    document.querySelectorAll('.ticker-item').forEach(item => {
+        const ticker = item.querySelector('.ticker-input').value.trim().split(' (')[0];
+        const weight = parseFloat(item.querySelector('.weight-input').value);
+        if (ticker && !isNaN(weight) && weight > 0) {
+            originalTickers.push(ticker);
+            originalWeights.push(weight);
+        }
+    });
+    
+    // Normalize weights to sum to 1 for pie chart
+    const totalWeight = originalWeights.reduce((a, b) => a + b, 0);
+    const normalizedWeights = originalWeights.map(w => w / totalWeight);
+    
     // Create charts
     createEquityCurveChart('equity-chart', data.chart_data);
     createDrawdownChart('drawdown-chart', data.chart_data);
-    
-    // Use annual returns chart instead of monthly returns
     createAnnualReturnsChart('returns-chart', data.chart_data);
+    
+    // Create allocation pie chart
+    createAllocationChart('allocation-chart', 'allocation-legend', originalTickers, normalizedWeights);
+    
+    // Create summary view with key metrics
+    createSummaryView(data.metrics, data.benchmark_metrics);
     
     // Scroll to results
     document.getElementById('results-container').scrollIntoView({
@@ -522,6 +543,69 @@ function displayMetrics(portfolioMetrics, benchmarkMetrics) {
 }
 
 /**
+ * Create summary view with key metrics
+ */
+function createSummaryView(portfolioMetrics, benchmarkMetrics) {
+    const summaryContainer = document.getElementById('summary-metrics');
+    if (!summaryContainer) return;
+    
+    summaryContainer.innerHTML = ''; // Clear any existing content
+    
+    // Key metrics to display in the summary
+    const keyMetrics = [
+        { id: 'total-return', label: 'Total Return', value: portfolioMetrics.total_return },
+        { id: 'cagr', label: 'CAGR', value: portfolioMetrics.cagr },
+        { id: 'volatility', label: 'Volatility', value: portfolioMetrics.volatility },
+        { id: 'sharpe', label: 'Sharpe Ratio', value: portfolioMetrics.sharpe_ratio },
+        { id: 'max-drawdown', label: 'Max Drawdown', value: portfolioMetrics.max_drawdown },
+    ];
+    
+    // Add each metric to the summary
+    keyMetrics.forEach(metric => {
+        const metricElement = document.createElement('div');
+        metricElement.className = 'metric-card';
+        
+        const metricTitle = document.createElement('div');
+        metricTitle.className = 'metric-title';
+        metricTitle.textContent = metric.label;
+        
+        const metricValue = document.createElement('div');
+        metricValue.className = 'metric-value';
+        metricValue.textContent = metric.value;
+        
+        // Add color class
+        if (metric.value !== 'N/A') {
+            const numValue = parseFloat(metric.value.replace('%', ''));
+            if (!isNaN(numValue)) {
+                // For drawdown, negative is actually positive (less drawdown is good)
+                if (metric.id === 'max-drawdown') {
+                    metricValue.classList.add(numValue > -10 ? 'positive' : 'negative');
+                } else {
+                    metricValue.classList.add(numValue >= 0 ? 'positive' : 'negative');
+                }
+            }
+        }
+        
+        const benchmarkValue = document.createElement('div');
+        benchmarkValue.className = 'benchmark-value';
+        
+        if (benchmarkMetrics) {
+            const benchmarkKey = metric.id.replace(/-/g, '_');
+            const benchmarkMetricValue = benchmarkMetrics[benchmarkKey] || 'N/A';
+            benchmarkValue.textContent = `Benchmark: ${benchmarkMetricValue}`;
+        } else {
+            benchmarkValue.textContent = 'Benchmark: N/A';
+        }
+        
+        metricElement.appendChild(metricTitle);
+        metricElement.appendChild(metricValue);
+        metricElement.appendChild(benchmarkValue);
+        
+        summaryContainer.appendChild(metricElement);
+    });
+}
+
+/**
  * Add positive/negative color classes to values
  */
 function colorizeValue(elementId, value) {
@@ -534,7 +618,7 @@ function colorizeValue(elementId, value) {
         
         if (!isNaN(numValue)) {
             // For drawdown, negative is actually positive (less drawdown is good)
-            if (elementId === 'max-drawdown-value') {
+            if (elementId === 'max-drawdown-value' || elementId === 'benchmark-max-drawdown-value') {
                 element.classList.add(numValue > -10 ? 'positive' : 'negative');
             } else {
                 element.classList.add(numValue >= 0 ? 'positive' : 'negative');

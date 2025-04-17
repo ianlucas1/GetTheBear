@@ -7,7 +7,7 @@
     <div class="error-message" id="error-message"></div>
     
     <form id="analysis-form">
-        <!-- Date Range Selection -->
+        <!-- Date Range Selection and Benchmark -->
         <div class="form-group" style="display: flex; gap: 20px;">
             <div style="flex: 1;">
                 <label for="start-date">Start Date</label>
@@ -16,6 +16,23 @@
             <div style="flex: 1;">
                 <label for="end-date">End Date</label>
                 <input type="date" id="end-date" name="end-date" required>
+            </div>
+            <div style="flex: 1;">
+                <label for="benchmark-select">Benchmark</label>
+                <div id="benchmark-container">
+                    <select id="benchmark-select" name="benchmark-select" class="form-control">
+                        <option value="SPY" selected>SPY (S&P 500)</option>
+                        <option value="AOA">AOA (iShares Agg. Allocation)</option>
+                        <option value="AOR">AOR (iShares Growth Allocation)</option>
+                        <option value="AOM">AOM (iShares Moderate Allocation)</option>
+                        <option value="AOK">AOK (iShares Conservative Allocation)</option>
+                        <option value="VT">VT (Vanguard Total World)</option>
+                        <option value="VXUS">VXUS (Vanguard ex-US)</option>
+                        <option value="custom">Custom Ticker...</option>
+                    </select>
+                    <input type="text" id="custom-benchmark" name="custom-benchmark" 
+                           placeholder="Enter ticker symbol" style="display: none; margin-top: 5px;">
+                </div>
             </div>
         </div>
         
@@ -52,7 +69,7 @@
                 <tr>
                     <th style="text-align: left; padding: 10px; border-bottom: 2px solid #DFE1E6;">Metric</th>
                     <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;">Portfolio</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;">Benchmark (SPY)</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;" id="benchmark-header">Benchmark (SPY)</th>
                 </tr>
             </thead>
             <tbody>
@@ -99,14 +116,14 @@
         </table>
     </div>
     
-    <!-- Benchmark indicator for when SPY is in the portfolio -->
+    <!-- Benchmark indicator for when benchmark is in the portfolio -->
     <div id="benchmark-in-portfolio-notice" style="display: none; background-color: #E6EFFC; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;">
-        <strong>Note:</strong> The benchmark (SPY) is included in your portfolio. Separate metrics are shown based on SPY's performance alone.
+        <strong>Note:</strong> The benchmark (<span id="benchmark-name-notice">SPY</span>) is included in your portfolio. Separate metrics are shown based on the benchmark's performance alone.
     </div>
     
     <!-- Download Results Button -->
     <div style="margin: 20px 0;">
-        <button id="download-returns-btn" class="btn btn-success" disabled>Download Monthly Returns (CSV)</button>
+        <button id="download-returns-btn" class="btn btn-success" disabled>Download Returns Data (CSV)</button>
     </div>
     
     <!-- Chart Tabs -->

@@ -67,12 +67,33 @@ def get_cached_stock_data(ticker, start_date, end_date, interval='1mo'):
             logger.info(f"Cache hit for {ticker} from {start_date} to {end_date}")
             # Convert JSON to DataFrame
             json_data = result[0]
-            df = pd.read_json(json_data, orient='table')
             
-            # Ensure index is datetime type
-            df.index = pd.to_datetime(df.index)
-            
-            return df
+            try:
+                # For records oriented JSON (new format)
+                df_records = pd.DataFrame(json.loads(json_data))
+                
+                # Set the Date/index column as the index
+                if 'Date' in df_records.columns:
+                    df_records.set_index('Date', inplace=True)
+                elif 'index' in df_records.columns:
+                    df_records.set_index('index', inplace=True)
+                elif 'date' in df_records.columns:
+                    df_records.set_index('date', inplace=True)
+                
+                # Ensure index is datetime type
+                df_records.index = pd.to_datetime(df_records.index)
+                
+                return df_records
+            except Exception as e:
+                logger.warning(f"Error parsing cached data with records format: {str(e)}")
+                try:
+                    # Try table oriented JSON (old format) as fallback
+                    df = pd.read_json(json_data, orient='table')
+                    df.index = pd.to_datetime(df.index)
+                    return df
+                except Exception as e2:
+                    logger.error(f"Error parsing cached data: {str(e2)}")
+                    return None
         else:
             logger.info(f"Cache miss for {ticker} from {start_date} to {end_date}")
             return None
@@ -98,8 +119,31 @@ def cache_stock_data(ticker, df, start_date, end_date, interval='1mo'):
     try:
         cursor = conn.cursor()
         
-        # Convert DataFrame to JSON
-        json_data = df.reset_index().to_json(date_format='iso', orient='table')
+        # Handle MultiIndex columns in dataframe (common with yfinance)
+        if isinstance(df.columns, pd.MultiIndex):
+            # Extract just the Close column for the ticker
+            if (ticker, 'Close') in df.columns:
+                close_data = df[(ticker, 'Close')].copy()
+                # Create a new DataFrame with just the date index and Close price
+                simple_df = pd.DataFrame({'Close': close_data}, index=df.index)
+                df_to_cache = simple_df
+            else:
+                # Try to get the first Close column
+                close_cols = [col for col in df.columns if col[1] == 'Close']
+                if close_cols:
+                    close_data = df[close_cols[0]].copy()
+                    simple_df = pd.DataFrame({'Close': close_data}, index=df.index)
+                    df_to_cache = simple_df
+                else:
+                    logger.warning(f"No Close column found for {ticker}, cannot cache")
+                    return
+        else:
+            # Single-level columns - use as is
+            df_to_cache = df.copy()
+        
+        # Convert DataFrame to JSON (with records orient to avoid MultiIndex issues)
+        df_to_cache_reset = df_to_cache.reset_index()
+        json_data = df_to_cache_reset.to_json(date_format='iso', orient='records')
         
         # Insert or update cache
         cursor.execute("""

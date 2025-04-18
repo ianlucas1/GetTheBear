@@ -147,6 +147,7 @@ select {
 
 .ticker-weight {
   flex: 1;
+  min-width: 120px; /* Match width with weight-pill */
 }
 
 /* Weight controls styling */
@@ -169,11 +170,13 @@ select {
   display: flex;
   justify-content: flex-end;
   margin-top: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 15px;
+  margin-right: 10px;
 }
 
 #weight-sum {
   min-width: 120px;
+  margin-left: auto; /* Pushes to right edge */
 }
 
 @media (max-width: 768px) {

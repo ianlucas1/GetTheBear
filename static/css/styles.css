@@ -164,10 +164,16 @@ select {
   flex-wrap: wrap;
 }
 
-/* Add spacing between weight sum and controls */
-#weight-sum {
-  margin-top: 12px;
+/* Position the total weight indicator */
+.ticker-total-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
   margin-bottom: 8px;
+}
+
+#weight-sum {
+  min-width: 120px;
 }
 
 @media (max-width: 768px) {

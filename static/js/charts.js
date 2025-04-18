@@ -81,12 +81,12 @@ function createCorrelationChart(elementId, correlationData) {
             }
         },
         autosize: true,
-        height: 500,
+        height: 420,
         margin: {
-            l: 60,
-            r: 40,
-            t: 60,
-            b: 60
+            l: 50,
+            r: 30,
+            t: 50,
+            b: 50
         },
         font: {
             family: '"Inter", sans-serif',

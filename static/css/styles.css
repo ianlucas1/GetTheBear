@@ -173,11 +173,14 @@ select {
 .weight-pill {
   font-size: 14px;
   font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 16px;
+  padding: 10px;
+  border-radius: 4px;
   font-family: 'Roboto Mono', monospace;
   background-color: #F0F0F0;
   display: inline-block;
+  min-width: 100px;
+  text-align: center;
+  border: 1px solid var(--border);
 }
 
 .weight-pill.valid {
@@ -268,6 +271,10 @@ select {
   padding: 15px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   transition: all 0.3s ease;
+}
+
+#correlation-chart.chart-container {
+  height: 420px; /* Smaller height for correlation heatmap to better fit its container */
 }
 
 /* Add hover effect to chart containers */

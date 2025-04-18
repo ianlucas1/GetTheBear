@@ -1,210 +1,379 @@
 /**
- * Get the Bear – Portfolio Analysis Tool
- * Main JavaScript (2025‑04‑18 full‑file swap)
+ * Get the Bear - Portfolio Analysis Tool
+ * Main JavaScript File
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  initializeDatePicker();
-  setupTickerControls();
-  setupBenchmarkControl();
-  setupAnalysisForm();
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize application
+    initializeDatePicker();
+    setupTickerControls();
+    setupBenchmarkControl();
+    setupAnalysisForm();
 });
 
-/* ─────────────────────────  DATE‑PICKER  ───────────────────────── */
-
+/**
+ * Initialize date picker with default values
+ */
 function initializeDatePicker() {
-  const today          = new Date();
-  const endDateInput   = document.getElementById('end-date');
-  const startDateInput = document.getElementById('start-date');
-
-  const endDateStr   = today.toISOString().split('T')[0];
-  endDateInput.value = endDateStr;
-
-  const startDate = new Date(today);
-  startDate.setFullYear(today.getFullYear() - 5);
-  startDateInput.value = startDate.toISOString().split('T')[0];
-
-  endDateInput.max   = endDateStr;
-  startDateInput.max = endDateStr;
+    const today = new Date();
+    const endDateInput = document.getElementById('end-date');
+    const startDateInput = document.getElementById('start-date');
+    
+    // Format today's date as YYYY-MM-DD
+    const endDateStr = today.toISOString().split('T')[0];
+    endDateInput.value = endDateStr;
+    
+    // Default start date (5 years ago)
+    const startDate = new Date();
+    startDate.setFullYear(today.getFullYear() - 5);
+    const startDateStr = startDate.toISOString().split('T')[0];
+    startDateInput.value = startDateStr;
+    
+    // Set max date to today
+    endDateInput.max = endDateStr;
+    startDateInput.max = endDateStr;
 }
 
-/* ─────────────────────  TICKER / WEIGHT CONTROLS  ─────────────────── */
-
+/**
+ * Setup ticker input controls (add/remove)
+ */
 function setupTickerControls() {
-  const addTickerBtn        = document.getElementById('add-ticker');
-  const tickerInputs        = document.getElementById('ticker-inputs');
-  const equalWeightsBtn     = document.getElementById('btn-equal-weights');
-
-  addTickerRow();                            // start with one empty row
-  updateWeightSum();
-
-  /* add/remove rows -------------------------------------------------- */
-  addTickerBtn.addEventListener('click', addTickerRow);
-
-  tickerInputs.addEventListener('click', e => {
-    if (e.target.classList.contains('remove-ticker')) {
-      const rows = tickerInputs.querySelectorAll('.ticker-item');
-      if (rows.length > 1) {
-        e.target.closest('.ticker-item').remove();
-        updateWeightSum();
-      } else {
-        showError('Portfolio must contain at least one ticker');
-      }
-    }
-  });
-
-  /* auto‑uppercase ticker codes -------------------------------------- */
-  tickerInputs.addEventListener('blur', e => {
-    if (e.target.classList.contains('ticker-input')) {
-      e.target.value = e.target.value.toUpperCase();
-    }
-  }, true);
-
-  /* live sum / validation ------------------------------------------- */
-  tickerInputs.addEventListener('input', e => {
-    if (e.target.classList.contains('weight-input')) updateWeightSum();
-  });
-
-  /* equal‑weights button -------------------------------------------- */
-  equalWeightsBtn.addEventListener('click', () => {
-    const weightInputs = tickerInputs.querySelectorAll('.weight-input');
-    const n = weightInputs.length;
-    if (!n) return;
-
-    const base = Math.floor((100 / n) * 100) / 100;   // 2‑dp floor
-    const weights = Array(n).fill(base);
-    const remainder = +(100 - base * n).toFixed(2);   // what’s left
-
-    // distribute remainder one cent at a time
-    let cents = Math.round(remainder * 100);
-    for (let i = 0; cents > 0; i = (i + 1) % n, cents--) {
-      weights[i] += 0.01;
-    }
-
-    weightInputs.forEach((inp, idx) => {
-      inp.value = weights[idx].toFixed(2);
+    const addTickerBtn = document.getElementById('add-ticker');
+    const tickerInputsContainer = document.getElementById('ticker-inputs');
+    
+    // Add default ticker row
+    addTickerRow();
+    
+    // Add ticker button click handler
+    addTickerBtn.addEventListener('click', function() {
+        addTickerRow();
     });
-    updateWeightSum();
-  });
+    
+    // Remove ticker button delegation
+    tickerInputsContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-ticker')) {
+            const tickerRow = e.target.closest('.ticker-item');
+            
+            // Only remove if we have more than one ticker
+            if (document.querySelectorAll('.ticker-item').length > 1) {
+                tickerRow.remove();
+                updateWeightTotal(); // Update total after removing a row
+            } else {
+                showError('Portfolio must contain at least one ticker');
+            }
+        }
+    });
+    
+    // Add auto-uppercase functionality to all ticker inputs (both existing and future ones)
+    tickerInputsContainer.addEventListener('blur', function(e) {
+        if (e.target.classList.contains('ticker-input')) {
+            e.target.value = e.target.value.toUpperCase();
+        }
+    }, true);
+    
+    // Add listener for weight input changes
+    tickerInputsContainer.addEventListener('input', function(e) {
+        if (e.target.classList.contains('weight-input')) {
+            updateWeightTotal();
+        }
+    });
+    
+    // Function to apply equal weights
+    function applyEqualWeights() {
+        const tickerRows = document.querySelectorAll('.ticker-item');
+        
+        if (tickerRows.length > 0) {
+            // Distribute exactly 100% evenly with precise decimal handling
+            const numTickers = tickerRows.length;
+            
+            // Calculate equal weight with full precision
+            const equalWeight = 100 / numTickers;
+            
+            // Calculate rounded weights (2 decimal places)
+            const weights = Array(numTickers).fill(0).map(() => Math.floor(equalWeight * 100) / 100);
+            
+            // Calculate the sum after rounding
+            const sumAfterRounding = weights.reduce((sum, w) => sum + w, 0);
+            
+            // Calculate the remainder needed to reach exactly 100%
+            const remainder = parseFloat((100 - sumAfterRounding).toFixed(2));
+            
+            // Distribute the remainder among the first few items
+            if (remainder > 0) {
+                const incrementValue = 0.01;
+                let remainingIncrement = remainder * 100; // Convert to cents
+                
+                for (let i = 0; i < remainingIncrement; i++) {
+                    weights[i % numTickers] += incrementValue;
+                }
+            }
+            
+            // Set weights for all ticker inputs
+            tickerRows.forEach((row, index) => {
+                const weightInput = row.querySelector('.weight-input');
+                weightInput.value = weights[index].toFixed(2);
+                
+                // Trigger input event for validation
+                const inputEvent = new Event('input', { bubbles: true });
+                weightInput.dispatchEvent(inputEvent);
+            });
+            
+            updateWeightTotal();
+        }
+    }
+    
+    // Set up weighting method dropdown handler
+    const weightingSelect = document.getElementById('weighting-method');
+    weightingSelect.addEventListener('change', function() {
+        if (this.value === 'equal') {
+            applyEqualWeights();
+        }
+        // Additional weighting methods can be added here in the future
+    });
+    
+    // Initialize weight total
+    updateWeightTotal();
 }
 
-/* calc and colour‑code the weight total ----------------------------- */
-function updateWeightSum() {
-  const pill   = document.getElementById('weight-sum');
-  const inputs = [...document.querySelectorAll('.weight-input')];
-
-  const total  = inputs.reduce((s, i) => s + (+i.value || 0), 0);
-  pill.textContent = `Total: ${total.toFixed(1)}%`;
-
-  const valid = Math.abs(total - 100) < 0.1;          // ±0.1 %
-  pill.classList.toggle('valid',   valid);
-  pill.classList.toggle('invalid', !valid);
-
-  inputs.forEach(inp => {
-    inp.setCustomValidity(valid ? '' : 'Weights must sum to 100 %');
-  });
+/**
+ * Update the weight total indicator
+ */
+function updateWeightTotal() {
+    const weightInputs = document.querySelectorAll('.weight-input');
+    const weightTotalElement = document.getElementById('weight-sum');
+    
+    let totalWeight = 0;
+    
+    // Sum all weight inputs
+    weightInputs.forEach(input => {
+        const weight = parseFloat(input.value) || 0;
+        totalWeight += weight;
+    });
+    
+    // Update the weight total element
+    weightTotalElement.textContent = `Total: ${totalWeight.toFixed(1)}%`;
+    
+    // Add valid/invalid styling with weight-pill classes
+    weightTotalElement.classList.remove('valid', 'invalid');
+    
+    // Check if total is exactly 100% (within 0.05% tolerance)
+    if (Math.abs(totalWeight - 100) <= 0.05) {
+        weightTotalElement.classList.add('valid');
+    } else {
+        weightTotalElement.classList.add('invalid');
+    }
 }
 
-/* add a new blank row ------------------------------------------------ */
+/**
+ * Add a new ticker input row
+ */
 function addTickerRow() {
-  const wrap = document.getElementById('ticker-inputs');
-
-  const row = document.createElement('div');
-  row.className = 'ticker-item';
-
-  row.innerHTML = `
-    <div class="ticker-symbol">
-      <input type="text" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
-    </div>
-    <div class="ticker-weight">
-      <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
-    </div>
-    <button type="button" class="btn btn-danger btn-sm remove-ticker">×</button>
-  `;
-  wrap.appendChild(row);
+    const tickerInputsContainer = document.getElementById('ticker-inputs');
+    
+    const tickerRow = document.createElement('div');
+    tickerRow.className = 'ticker-item';
+    
+    tickerRow.innerHTML = `
+        <div class="ticker-symbol">
+            <input type="text" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
+        </div>
+        <div class="ticker-weight">
+            <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
+        </div>
+        <button type="button" class="btn btn-danger btn-sm remove-ticker">×</button>
+    `;
+    
+    tickerInputsContainer.appendChild(tickerRow);
+    
+    // Add auto-uppercase functionality to the newly added ticker input
+    const tickerInput = tickerRow.querySelector('.ticker-input');
+    tickerInput.addEventListener('blur', function() {
+        this.value = this.value.toUpperCase();
+    });
 }
 
-/* ───────────────────────────  BENCHMARK  ─────────────────────────── */
-
+/**
+ * Setup benchmark dropdown selector with autocomplete
+ */
 function setupBenchmarkControl() {
-  const benchmarkSelect      = document.getElementById('benchmark-select');
-  const customBenchmarkInput = document.getElementById('custom-benchmark');
-  const suggestionsContainer = document.getElementById('ticker-suggestions');
-
-  /* load tickers for Fuse.js ---------------------------------------- */
-  fetch('/static/data/tickers.csv')
-    .then(r => r.text())
-    .then(csv => {
-      const fuse = new Fuse(
-        csv.trim().split('\n').slice(1).map(line => {
-          const [ticker, name] = line.split(',');
-          return { ticker, name };
-        }),
-        { includeScore: true, keys: ['ticker', 'name'], threshold: 0.3 }
-      );
-
-      customBenchmarkInput.addEventListener('input', function () {
-        const q = this.value.trim();
-        if (q.length < 1) return (suggestionsContainer.style.display = 'none');
-
-        const html = fuse.search(q).slice(0, 10).map(r => `
-          <div class="suggestion-item" data-ticker="${r.item.ticker}">
-            <span class="suggestion-ticker">${r.item.ticker}</span>
-            <span class="suggestion-name">${r.item.name}</span>
-          </div>`).join('');
-
-        suggestionsContainer.innerHTML = html;
-        suggestionsContainer.style.display = html ? 'block' : 'none';
-      });
-
-      suggestionsContainer.addEventListener('click', e => {
-        const item = e.target.closest('.suggestion-item');
-        if (!item) return;
-        customBenchmarkInput.value = item.dataset.ticker;
-        suggestionsContainer.style.display = 'none';
-      });
+    const benchmarkSelect = document.getElementById('benchmark-select');
+    const customBenchmarkInput = document.getElementById('custom-benchmark');
+    const suggestionsContainer = document.getElementById('ticker-suggestions');
+    
+    // Store tickers data for fuzzy search
+    let tickersData = [];
+    
+    // Load tickers data
+    fetch('/static/data/tickers.csv')
+        .then(response => response.text())
+        .then(csv => {
+            // Parse CSV manually (minimal implementation)
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',');
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                const values = lines[i].split(',');
+                tickersData.push({
+                    ticker: values[0],
+                    name: values[1]
+                });
+            }
+            
+            // Initialize Fuse.js for fuzzy search
+            initFuzzySearch(tickersData);
+        })
+        .catch(error => {
+            console.error('Error loading tickers data:', error);
+        });
+    
+    // Initialize Fuse.js
+    function initFuzzySearch(data) {
+        const options = {
+            includeScore: true,
+            keys: ['ticker', 'name'],
+            threshold: 0.3
+        };
+        
+        const fuse = new Fuse(data, options);
+        
+        // Setup input event for autocomplete
+        customBenchmarkInput.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (query.length < 1) {
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            
+            // Perform fuzzy search
+            const results = fuse.search(query);
+            
+            // Limit to 10 results
+            const topResults = results.slice(0, 10);
+            
+            // Build suggestions HTML
+            let suggestionsHTML = '';
+            
+            if (topResults.length > 0) {
+                topResults.forEach(result => {
+                    const item = result.item;
+                    suggestionsHTML += `
+                        <div class="suggestion-item" data-ticker="${item.ticker}">
+                            <span class="suggestion-ticker">${item.ticker}</span>
+                            <span class="suggestion-name">${item.name}</span>
+                        </div>
+                    `;
+                });
+                
+                suggestionsContainer.innerHTML = suggestionsHTML;
+                suggestionsContainer.style.display = 'block';
+                
+                // Add click event to suggestions
+                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
+                suggestionItems.forEach(item => {
+                    item.addEventListener('click', function() {
+                        const ticker = this.getAttribute('data-ticker');
+                        const name = this.querySelector('.suggestion-name').textContent;
+                        customBenchmarkInput.value = `${ticker} (${name})`;
+                        suggestionsContainer.style.display = 'none';
+                    });
+                });
+            } else {
+                suggestionsContainer.style.display = 'none';
+            }
+        });
+    }
+    
+    // Handle switching between dropdown and custom input
+    benchmarkSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            customBenchmarkInput.style.display = 'block';
+            customBenchmarkInput.focus();
+            customBenchmarkInput.required = true;
+        } else {
+            customBenchmarkInput.style.display = 'none';
+            customBenchmarkInput.required = false;
+            suggestionsContainer.style.display = 'none';
+        }
     });
-
-  /* dropdown ↔ custom input ----------------------------------------- */
-  benchmarkSelect.addEventListener('change', function () {
-    const custom = this.value === 'custom';
-    customBenchmarkInput.style.display = custom ? 'block' : 'none';
-    customBenchmarkInput.required      = custom;
-    if (custom) customBenchmarkInput.focus();
-  });
+    
+    // Add auto-uppercase functionality to custom benchmark input
+    customBenchmarkInput.addEventListener('blur', function() {
+        this.value = this.value.toUpperCase();
+        // Hide suggestions when focus is lost
+        setTimeout(() => {
+            suggestionsContainer.style.display = 'none';
+        }, 200); // Small delay to allow click on suggestion
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!customBenchmarkInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
 }
 
-/* ──────────────────────────  FORM / TABS  ────────────────────────── */
-
+/**
+ * Setup the analysis form submission
+ */
 function setupAnalysisForm() {
-  const form        = document.getElementById('analysis-form');
-  const downloadBtn = document.getElementById('download-returns-btn');
-
-  form.addEventListener('submit', e => { e.preventDefault(); analyzePortfolio(); });
-  downloadBtn.addEventListener('click', downloadReturns);
-
-  /* simple tab switcher --------------------------------------------- */
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const id = tab.dataset.tab;
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === id));
+    const analysisForm = document.getElementById('analysis-form');
+    const submitBtn = document.getElementById('analyze-btn');
+    const downloadBtn = document.getElementById('download-returns-btn');
+    
+    // Form submission handler
+    analysisForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        analyzePortfolio();
     });
-  });
+    
+    // Download returns button
+    downloadBtn.addEventListener('click', function() {
+        downloadReturns();
+    });
+    
+    // Tab switching
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            // Remove active class from all tabs
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const tabId = this.getAttribute('data-tab');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
 }
 
-/* ───────────────────────────  UTILITIES  ─────────────────────────── */
-
-function showError(msg) {
-  const el = document.getElementById('error-message');
-  el.textContent = msg;
-  el.style.display = 'block';
-  setTimeout(() => (el.style.display = 'none'), 5000);
+/**
+ * Show error message
+ */
+function showError(message) {
+    const errorElement = document.getElementById('error-message');
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        errorElement.style.display = 'none';
+    }, 5000);
 }
 
+/**
+ * Show loading spinner
+ */
 function showLoading(show) {
-  document.getElementById('loader').style.display = show ? 'block' : 'none';
+    document.getElementById('loader').style.display = show ? 'block' : 'none';
 }
 
 /**

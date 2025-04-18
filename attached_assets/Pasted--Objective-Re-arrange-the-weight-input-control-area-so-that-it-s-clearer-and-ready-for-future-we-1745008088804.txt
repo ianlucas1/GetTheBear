@@ -1,0 +1,43 @@
+**Objective:** Re‑arrange the weight‑input control area so that it’s clearer and ready for future weighting options.
+
+1. **Move the Total‑weight pill**
+   * In `templates/index.html`, relocate the HTML for  
+     ```html
+     <div id="weight-sum" class="weight-pill">Total: 0%</div>
+     ```  
+     so it sits **directly below** the list of security‑weight input fields (i.e., below `#ticker-inputs`).  
+   * No style changes are needed—you’re only changing its position in the DOM.
+
+2. **Replace “Equal Weights” link with a Weighting dropdown**
+   * In the same block, remove the existing  
+     ```html
+     <button type="button" id="btn-equal-weights" …>Equal Weights</button>
+     ```  
+     and insert a `<select>` element:
+     ```html
+     <select id="weighting-method" class="form-control">
+       <option value="equal" selected>Equal Weighting</option>
+       <!-- (stub) future methods will go here -->
+     </select>
+     ```
+   * Give it the same `btn-outline` look (minor CSS tweak in `static/css/styles.css`: style the new select to match buttons—padding 10 px, border 1 px solid var(--primary), etc.).
+
+3. **Move the “Add Ticker” button up**
+   * Within the `.weights-controls` section, place
+     ```html
+     <button type="button" id="add-ticker" class="btn btn-secondary">Add Ticker</button>
+     ```
+     **beside** the weighting dropdown (i.e., on the same row, before the Total‑weight pill).  
+   * Keep the row flex‐layout: `Add Ticker | Weighting dropdown | Total weight`.
+
+4. **JavaScript updates (static/js/main.js)**
+   * Update DOM queries so:
+     * `document.getElementById('btn-equal-weights')` is replaced with `weightingSelect = document.getElementById('weighting-method')`.
+     * On `change` of `weightingSelect`, if `value === 'equal'`, invoke the existing equal‑weight logic (now extracted into a small function `applyEqualWeights()` so it can be reused).
+   * Remove the click listener tied to the old Equal Weights button.
+
+5. **Ensure styling remains tidy**
+   * `.weight-controls-row` should stay `flex; gap:12px; align-items:center; flex-wrap:wrap;`.
+   * Add a media‑query tweak if needed so on narrow screens the three elements stack nicely.
+
+_No other functionality should change. Build, run, and verify the UI now shows “Add Ticker | Weighting▼ | Total: 0%” (total pill turns green/red as before) under the weight inputs._

@@ -154,14 +154,20 @@ select {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .weight-controls-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 15px;
   flex-wrap: wrap;
+}
+
+/* Add spacing between weight sum and controls */
+#weight-sum {
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 @media (max-width: 768px) {
@@ -207,6 +213,24 @@ select {
 }
 
 .btn-outline:hover {
+  background-color: rgba(0, 82, 204, 0.1);
+}
+
+/* Style for the weighting method dropdown */
+select.form-control.btn-outline {
+  appearance: auto;
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  padding: 9px 15px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+select.form-control.btn-outline:hover {
   background-color: rgba(0, 82, 204, 0.1);
 }
 
@@ -271,10 +295,6 @@ select {
   padding: 15px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   transition: all 0.3s ease;
-}
-
-#correlation-chart.chart-container {
-  height: 420px; /* Smaller height for correlation heatmap to better fit its container */
 }
 
 /* Add hover effect to chart containers */
@@ -572,38 +592,4 @@ select {
     padding: 8px 12px;
     font-size: 13px;
   }
-}
-/* ─────── Get‑the‑Bear layout tweaks (2025‑04‑18) ─────── */
-
-/* 1) Equal‑Weights row */
-.weight-controls-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: nowrap;        /* keep on one line */
-  margin-bottom: 12px;
-}
-
-/* 2) Total‑weight pill same width as a weight input */
-.weight-pill {
-  flex: 1 1 160px;          /* grow + shrink, min 160 px */
-  text-align: center;
-}
-
-/* 3) Add‑ticker button full row, subtle background */
-.add-ticker-btn {
-  width: 100%;
-  margin-top: 4px;
-}
-
-/* 4) Correlation heat‑map wrapper so the plot fits nicely */
-.correlation-wrapper {
-  height: 380px;            /* slightly shorter than default */
-  font-size: 15px;          /* labels match Inter body size */
-}
-
-#correlation-chart .xtick text,
-#correlation-chart .ytick text {
-  font-size: 15px !important;   /* unify tick‑label font */
-  font-family: 'Inter', sans-serif !important;
 }

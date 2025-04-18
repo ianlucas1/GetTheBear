@@ -3,41 +3,175 @@
  * Charts JavaScript File
  */
 
-/* ──────────────────  CORRELATION HEAT‑MAP  ────────────────── */
-function createCorrelationChart(containerId, matrix) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+/**
+ * Create correlation heatmap using Plotly
+ */
+function createCorrelationChart(elementId, correlationData) {
+    // Extract tickers and matrix data
+    const tickers = correlationData.tickers;
+    const matrixValues = correlationData.matrix;
+    const textLabels = correlationData.labels || matrixValues; // Use provided labels or fall back to matrix values
+    
+    // Define a color scale: blue for negative, white for zero, red for positive correlations
+    const colorScale = [
+        [0, '#4169E1'],        // Royal Blue for strong negative correlation
+        [0.25, '#B6D0E5'],     // Light blue for weak negative correlation
+        [0.5, '#FFFFFF'],      // White for no correlation
+        [0.75, '#FFCCCB'],     // Light red for weak positive correlation
+        [1, '#FF0000']         // Bright red for strong positive correlation
+    ];
+    
+    // Create text array with formatted labels and determine font colors
+    const text = textLabels.map(row => 
+        row.map(val => val.toFixed(2))
+    );
+    
+    // Set font color based on correlation value
+    // Dark values for light backgrounds, light values for dark backgrounds
+    const fontColors = textLabels.map(row => 
+        row.map(val => {
+            const absVal = Math.abs(val);
+            if (absVal > 0.7) {
+                // Strong correlation (positive or negative) - use white text
+                return '#FFFFFF';
+            } else {
+                // Weaker correlation - use dark text
+                return '#172B4D';
+            }
+        })
+    );
+    
+    // Create the heatmap trace
+    const trace = {
+        z: matrixValues,
+        x: tickers,
+        y: tickers,
+        type: 'heatmap',
+        colorscale: colorScale,
+        zmin: -1,              // Minimum correlation value
+        zmax: 1,               // Maximum correlation value
+        showscale: true,
+        colorbar: {
+            title: 'Correlation',
+            titleside: 'right',
+            titlefont: {
+                size: 14,
+                family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif"
+            }
+        },
+        // Add text labels to cells
+        text: text,
+        texttemplate: '%{text}',
+        textfont: {
+            color: fontColors,
+            family: '"Inter", sans-serif',
+            size: 16
+        },
+        // Format the hover text to show exact correlation values
+        hovertemplate: '%{y} ↔ %{x}: %{z:.2f}<extra></extra>'
+    };
+    
+    // Layout configuration for the heatmap
+    const layout = {
+        title: {
+            text: 'Returns Correlation Matrix',
+            font: {
+                family: '"Inter", sans-serif',
+                size: 18
+            }
+        },
+        autosize: true,
+        height: 500,
+        margin: {
+            l: 60,
+            r: 40,
+            t: 60,
+            b: 60
+        },
+        font: {
+            family: '"Inter", sans-serif',
+            size: 16
+        },
+        xaxis: {
+            title: '',
+            titlefont: {
+                family: '"Inter", sans-serif',
+                size: 16
+            },
+            tickfont: {
+                family: '"Inter", sans-serif',
+                size: 16
+            },
+            tickangle: -45
+        },
+        yaxis: {
+            title: '',
+            titlefont: {
+                family: '"Inter", sans-serif',
+                size: 16
+            },
+            tickfont: {
+                family: '"Inter", sans-serif',
+                size: 16
+            }
+        },
+        // Add annotation explaining the heatmap
+        annotations: [
+            {
+                x: 0.5,
+                y: -0.15,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'This heatmap shows the correlation between monthly returns of all assets in the portfolio.',
+                showarrow: false,
+                font: {
+                    family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                    size: 12
+                }
+            },
+            {
+                x: 0.5,
+                y: -0.2,
+                xref: 'paper',
+                yref: 'paper',
+                text: 'Red = positive correlation (move together), Blue = negative correlation (move oppositely).',
+                showarrow: false,
+                font: {
+                    family: "'Open Sans', 'Helvetica Neue', Helvetica, sans-serif",
+                    size: 12
+                }
+            }
+        ]
+    };
+    
+    // Increase annotation font size
+    layout.annotations.forEach(anno => {
+        anno.font = {
+            family: '"Inter", sans-serif',
+            size: 16
+        };
+    });
 
-  const labels = matrix.tickers;          // axis labels
-  const z      = matrix.values;           // 2‑D array of r‑values
-
-  const data = [{
-    type:        'heatmap',
-    z,
-    x:           labels,
-    y:           labels,
-    zmin:       -1,
-    zmax:        1,
-    colorscale: 'RdBu',
-    reversescale: true,
-    showscale:   true,
-    text:        z.map(r => r.map(v => v.toFixed(2))),
-    texttemplate: '%{text}',
-    textfont: { family: 'Inter, sans-serif', size: 14, color: '#FFFFFF' }
-  }];
-
-  const layout = {
-    title: { text: 'Returns Correlation Matrix', font: { size: 20 } },
-    margin: { l: 90, r: 50, t: 60, b: 90 },        // tighter fit
-    yaxis: { automargin: true, tickfont: { size: 14 } },
-    xaxis: { automargin: true, tickangle: -40, tickfont: { size: 14 } },
-    width:  container.offsetWidth - 30,            // keep inside card
-    height: 420                                    // matches CSS rule
-  };
-
-  Plotly.newPlot(container, data, layout, { responsive: true });
+    // Create the heatmap
+    Plotly.newPlot(elementId, [trace], layout, {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        displaylogo: false,
+        toImageButtonOptions: {
+            format: 'png',
+            filename: 'correlation_heatmap',
+            height: 500,
+            width: 700,
+            scale: 1
+        }
+    });
+    
+    // Add window resize handler to keep chart responsive
+    window.addEventListener('resize', function() {
+        Plotly.Plots.resize(document.getElementById(elementId));
+    });
 }
-
 
 /**
  * Create allocation pie chart using Plotly

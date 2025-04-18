@@ -573,3 +573,37 @@ select {
     font-size: 13px;
   }
 }
+/* ─────── Get‑the‑Bear layout tweaks (2025‑04‑18) ─────── */
+
+/* 1) Equal‑Weights row */
+.weight-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;        /* keep on one line */
+  margin-bottom: 12px;
+}
+
+/* 2) Total‑weight pill same width as a weight input */
+.weight-pill {
+  flex: 1 1 160px;          /* grow + shrink, min 160 px */
+  text-align: center;
+}
+
+/* 3) Add‑ticker button full row, subtle background */
+.add-ticker-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* 4) Correlation heat‑map wrapper so the plot fits nicely */
+.correlation-wrapper {
+  height: 380px;            /* slightly shorter than default */
+  font-size: 15px;          /* labels match Inter body size */
+}
+
+#correlation-chart .xtick text,
+#correlation-chart .ytick text {
+  font-size: 15px !important;   /* unify tick‑label font */
+  font-family: 'Inter', sans-serif !important;
+}

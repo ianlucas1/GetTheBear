@@ -122,14 +122,11 @@ function setupTickerControls() {
         }
     }
     
-    // Set up weighting method dropdown handler
-    const weightingSelect = document.getElementById('weighting-method');
-    if (weightingSelect) {
-        weightingSelect.addEventListener('change', function() {
-            if (this.value === 'equal') {
-                applyEqualWeights();
-            }
-            // Additional weighting methods can be added here in the future
+    // Set up Equal Weights button handler
+    const equalWeightsBtn = document.getElementById('btn-equal-weights');
+    if (equalWeightsBtn) {
+        equalWeightsBtn.addEventListener('click', function() {
+            applyEqualWeights();
         });
     }
     

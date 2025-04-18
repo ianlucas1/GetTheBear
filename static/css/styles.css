@@ -168,7 +168,7 @@ select {
 /* Position the total weight indicator */
 .ticker-control-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-top: 8px;
   margin-bottom: 15px;
@@ -177,7 +177,7 @@ select {
 
 #btn-equal-weights {
   min-width: 140px;
-  margin-right: 10px;
+  margin-left: 15px; /* Space between button and weight pill */
 }
 
 #weight-sum {

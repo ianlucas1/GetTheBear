@@ -166,17 +166,21 @@ select {
 }
 
 /* Position the total weight indicator */
-.ticker-total-row {
+.ticker-control-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 8px;
   margin-bottom: 15px;
   margin-right: 10px;
 }
 
+#weighting-method {
+  min-width: 160px;
+}
+
 #weight-sum {
   min-width: 120px;
-  margin-left: auto; /* Pushes to right edge */
 }
 
 @media (max-width: 768px) {

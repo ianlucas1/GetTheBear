@@ -45,16 +45,16 @@
             <div id="ticker-inputs" class="ticker-inputs">
                 <!-- Ticker inputs will be added here dynamically -->
             </div>
-            <div class="ticker-total-row">
+            <div class="ticker-control-row">
+                <select id="weighting-method" class="form-control btn-outline">
+                    <option value="equal">Equal Weighting</option>
+                    <!-- (stub) future methods will go here -->
+                </select>
                 <div id="weight-sum" class="weight-pill">Total: 0%</div>
             </div>
             <div class="weights-controls">
                 <div class="weight-controls-row">
                     <button type="button" id="add-ticker" class="btn btn-secondary">Add Ticker</button>
-                    <select id="weighting-method" class="form-control btn-outline">
-                        <option value="equal" selected>Equal Weighting</option>
-                        <!-- (stub) future methods will go here -->
-                    </select>
                 </div>
             </div>
         </div>

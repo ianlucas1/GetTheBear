@@ -269,42 +269,60 @@ function setupBenchmarkControl() {
             // Limit to 10 results
             const topResults = results.slice(0, 10);
             
-            // Build suggestions HTML
-            let suggestionsHTML = '';
-            
+            // Build suggestions HTML -> Changed to safe DOM manipulation
+            // let suggestionsHTML = ''; 
+            suggestionsContainer.innerHTML = ''; // Clear previous suggestions
+
             if (topResults.length > 0) {
                 topResults.forEach((result, index) => {
                     const item = result.item;
-                    // Add role="option" and a unique ID to each suggestion
-                    suggestionsHTML += `
-                        <div class="suggestion-item" 
-                             role="option" 
-                             id="suggestion-${index}" 
-                             data-ticker="${item.ticker}">
-                            <span class="suggestion-ticker">${item.ticker}</span>
-                            <span class="suggestion-name">${item.name}</span>
-                        </div>
-                    `;
-                });
-                
-                suggestionsContainer.innerHTML = suggestionsHTML;
-                suggestionsContainer.style.display = 'block';
-                // Set aria-expanded to true when suggestions are shown
-                customBenchmarkInput.setAttribute('aria-expanded', 'true');
-                
-                // Add click event to suggestions
-                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
-                suggestionItems.forEach(item => {
-                    item.addEventListener('click', function() {
-                        const ticker = this.getAttribute('data-ticker');
+                    
+                    // Create suggestion item element
+                    const suggestionDiv = document.createElement('div');
+                    suggestionDiv.className = 'suggestion-item';
+                    suggestionDiv.setAttribute('role', 'option');
+                    suggestionDiv.id = `suggestion-${index}`;
+                    suggestionDiv.dataset.ticker = item.ticker; // Use dataset for data attributes
+
+                    // Create ticker span
+                    const tickerSpan = document.createElement('span');
+                    tickerSpan.className = 'suggestion-ticker';
+                    tickerSpan.textContent = item.ticker; // Use textContent (safe)
+
+                    // Create name span
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'suggestion-name';
+                    nameSpan.textContent = item.name; // Use textContent (safe)
+
+                    // Append spans to the suggestion div
+                    suggestionDiv.appendChild(tickerSpan);
+                    suggestionDiv.appendChild(nameSpan);
+
+                    // Add click listener directly to the created element
+                    suggestionDiv.addEventListener('click', function() {
+                        const ticker = this.dataset.ticker; // Access via dataset
                         const name = this.querySelector('.suggestion-name').textContent;
                         customBenchmarkInput.value = `${ticker} (${name})`;
                         suggestionsContainer.style.display = 'none';
-                        // Set aria-expanded to false when a suggestion is clicked
                         customBenchmarkInput.setAttribute('aria-expanded', 'false');
                         customBenchmarkInput.removeAttribute('aria-activedescendant');
                     });
+
+                    // Append the new suggestion div to the container
+                    suggestionsContainer.appendChild(suggestionDiv);
                 });
+                
+                // suggestionsContainer.innerHTML = suggestionsHTML; -> Replaced by appendChild loop
+                suggestionsContainer.style.display = 'block';
+                customBenchmarkInput.setAttribute('aria-expanded', 'true');
+                
+                // Add click event to suggestions -> Moved inside loop
+                /* 
+                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
+                suggestionItems.forEach(item => {
+                    // Click listener moved to element creation above
+                });
+                */
             } else {
                 suggestionsContainer.style.display = 'none';
                 // Set aria-expanded to false when no results found

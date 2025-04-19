@@ -243,8 +243,9 @@ def create_app(test_config=None):
             )
 
         except Exception as e:
-            current_app.logger.exception("Error analyzing portfolio") # Use app logger
-            return jsonify({"error": str(e)}), 500
+            current_app.logger.exception("Error analyzing portfolio") # Log full error
+            # Return generic message to user
+            return jsonify({"error": "An unexpected error occurred during portfolio analysis."}), 500
 
 
     @app.route("/download_returns", methods=["GET"])
@@ -408,8 +409,9 @@ def create_app(test_config=None):
             )
 
         except Exception as e:
-            current_app.logger.exception("Error generating returns CSV") # Use app logger
-            return jsonify({"error": str(e)}), 500
+            current_app.logger.exception("Error generating returns CSV") # Log full error
+            # Return generic message to user
+            return jsonify({"error": "An unexpected error occurred while generating the returns CSV."}), 500
 
     # Return the configured app instance
     return app
@@ -417,6 +419,6 @@ def create_app(test_config=None):
 # --- Main Execution ---
 if __name__ == "__main__":
     app = create_app()
-    # Use debug=True only for development
-    # In production, use a proper WSGI server like Gunicorn or Waitress
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Use debug=True only if FLASK_DEBUG env var is set
+    is_debug = os.environ.get('FLASK_DEBUG') == '1'
+    app.run(host="0.0.0.0", port=5000, debug=is_debug)

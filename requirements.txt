@@ -123,7 +123,7 @@ gensim @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/gensim_
 gitdb @ file:///tmp/build/80754af9/gitdb_1617117951232/work
 GitPython @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/gitpython_1699254434447/work
 google-ai-generativelanguage==0.6.10
-google-api-core==2.22.0
+google-api-core==2.24.2
 google-api-python-client==2.151.0
 google-auth==2.36.0
 google-auth-httplib2==0.2.0

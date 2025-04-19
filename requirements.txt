@@ -306,7 +306,7 @@ pycosat @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_19
 pycparser @ file:///tmp/build/80754af9/pycparser_1636541352034/work
 pyct @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/pyct_1699248363282/work
 pycurl @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/pycurl_1699260943197/work
-pydantic==2.10.6
+pydantic==2.11.3
 pydantic_core==2.27.2
 pydeck @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_df_5iy65um/croot/pydeck_1706194077123/work
 PyDispatcher @ file:///Users/builder/cbouss/perseverance-python-buildout/croot/pydispatcher_1699248379667/work

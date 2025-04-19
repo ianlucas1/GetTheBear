@@ -1,205 +1,159 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<!-- Portfolio Input Section -->
+<!-- ========================= Portfolio Input Section ========================= -->
 <section class="section">
-    <h2 class="section-title">Portfolio Setup</h2>
-    <div class="error-message" id="error-message"></div>
-    
-    <form id="analysis-form">
-        <!-- Date Range Selection and Benchmark -->
-        <div class="form-group" style="display: flex; gap: 20px;">
-            <div style="flex: 1;">
-                <label for="start-date">Start Date</label>
-                <input type="date" id="start-date" name="start-date" required>
-            </div>
-            <div style="flex: 1;">
-                <label for="end-date">End Date</label>
-                <input type="date" id="end-date" name="end-date" required>
-            </div>
-            <div style="flex: 1;">
-                <label for="benchmark-select">Benchmark</label>
-                <div id="benchmark-container">
-                    <select id="benchmark-select" name="benchmark-select" class="form-control">
-                        <option value="SPY" selected>SPY (S&P 500)</option>
-                        <option value="AOA">AOA (iShares Agg. Allocation)</option>
-                        <option value="AOR">AOR (iShares Growth Allocation)</option>
-                        <option value="AOM">AOM (iShares Moderate Allocation)</option>
-                        <option value="AOK">AOK (iShares Conservative Allocation)</option>
-                        <option value="VT">VT (Vanguard Total World)</option>
-                        <option value="VXUS">VXUS (Vanguard ex-US)</option>
-                        <option value="custom">Custom Ticker...</option>
-                    </select>
-                    <div class="autocomplete-container">
-                        <input type="text" id="custom-benchmark" name="custom-benchmark" 
-                               placeholder="Enter ticker symbol" style="display: none; margin-top: 5px;">
-                        <div id="ticker-suggestions" class="suggestions-container"></div>
-                    </div>
-                </div>
-            </div>
+  <h2 class="section-title">Portfolio Setup</h2>
+  <div class="error-message" id="error-message"></div>
+
+  <form id="analysis-form">
+    <!-- ----------------------- Date range & benchmark ----------------------- -->
+    <div class="form-group" style="display:flex; gap:20px;">
+      <div style="flex:1;">
+        <label for="start-date">Start Date</label>
+        <input type="date" id="start-date" name="start-date" required>
+      </div>
+      <div style="flex:1;">
+        <label for="end-date">End Date</label>
+        <input type="date" id="end-date" name="end-date" required>
+      </div>
+      <div style="flex:1;">
+        <label for="benchmark-select">Benchmark</label>
+        <div id="benchmark-container">
+          <select id="benchmark-select" name="benchmark-select" class="form-control">
+            <option value="SPY" selected>SPY (S&amp;P&nbsp;500)</option>
+            <option value="AOA">AOA (iShares Agg.)</option>
+            <option value="AOR">AOR (iShares Growth)</option>
+            <option value="AOM">AOM (iShares Moderate)</option>
+            <option value="AOK">AOK (iShares Conservative)</option>
+            <option value="VT">VT (Vanguard Total World)</option>
+            <option value="VXUS">VXUS (Vanguard ex‑US)</option>
+            <option value="custom">Custom&nbsp;Ticker…</option>
+          </select>
+          <div class="autocomplete-container">
+            <input id="custom-benchmark" name="custom-benchmark" placeholder="Enter ticker symbol" style="display:none;margin-top:5px;">
+            <div id="ticker-suggestions" class="suggestions-container"></div>
+          </div>
         </div>
-        
-        <!-- Portfolio Tickers -->
-        <div class="form-group">
-            <label>Portfolio Securities</label>
-            <div id="ticker-inputs" class="ticker-inputs">
-                <!-- Ticker inputs will be added here dynamically -->
-            </div>
-            <div class="ticker-control-row">
-                <div id="weight-sum" class="weight-pill">Total: 0%</div>
-                <button type="button" id="btn-equal-weights" class="btn btn-outline">Equal Weights</button>
-            </div>
-            <div class="weights-controls">
-                <div class="weight-controls-row">
-                    <button type="button" id="add-ticker" class="btn btn-secondary">Add Ticker</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Analysis Button -->
-        <div class="form-group" style="margin-top: 20px;">
-            <button type="submit" id="analyze-btn" class="btn btn-primary">Analyze Portfolio</button>
-        </div>
-    </form>
-    
-    <!-- Loading Indicator -->
-    <div id="loader" class="loader">
-        <div class="spinner"></div>
-        <p>Retrieving data and analyzing portfolio...</p>
+      </div>
     </div>
+
+    <!-- --------------------------- Ticker inputs --------------------------- -->
+    <div class="form-group">
+      <label>Portfolio Securities</label>
+      <div id="ticker-inputs" class="ticker-inputs"><!-- dynamic inputs --></div>
+
+      <!-- Button left, badge right (flex row) -->
+      <div class="ticker-control-row" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <button id="btn-equal-weights" type="button" class="btn btn-outline">Equal Weights</button>
+        <div id="weight-sum" class="weight-pill">Total: 0 %</div>
+      </div>
+
+      <div class="weights-controls">
+        <div class="weight-controls-row">
+          <button id="add-ticker" type="button" class="btn btn-secondary">Add Ticker</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analyse button -->
+    <div class="form-group" style="margin-top:20px;">
+      <button id="analyze-btn" type="submit" class="btn btn-primary">Analyze Portfolio</button>
+    </div>
+  </form>
+
+  <!-- Loading indicator -->
+  <div id="loader" class="loader">
+    <div class="spinner"></div>
+    <p>Retrieving data and analyzing portfolio…</p>
+  </div>
 </section>
 
-<!-- Results Section -->
+<!-- ============================= Results Section ============================= -->
 <section id="results-container" class="section results-container">
-    <h2 class="section-title">Portfolio Analysis Results</h2>
-    
-    <!-- Metrics Summary -->
-    <div class="metrics-table">
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-            <thead>
-                <tr>
-                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid #DFE1E6;">Metric</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;">Portfolio</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 2px solid #DFE1E6;" id="benchmark-header">Benchmark (SPY)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">CAGR</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="cagr-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-cagr-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Volatility</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="volatility-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-volatility-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Sharpe Ratio</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="sharpe-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-sharpe-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Max Drawdown</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="max-drawdown-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-max-drawdown-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Max Drawdown Duration</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="max-drawdown-duration-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-max-drawdown-duration-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Sortino Ratio</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="sortino-ratio-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-sortino-ratio-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Calmar Ratio</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="calmar-ratio-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-calmar-ratio-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Total Return</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="total-return-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-total-return-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Rolling 12M Return</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="rolling-return-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-rolling-return-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Rolling 12M Volatility</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="rolling-volatility-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-rolling-volatility-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Best Month</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="best-month-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-best-month-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Worst Month</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="worst-month-value">--</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="benchmark-worst-month-value">--</td>
-                </tr>
-                <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #DFE1E6;">Time Period</td>
-                    <td class="value-cell" style="text-align: right; padding: 8px; border-bottom: 1px solid #DFE1E6;" id="period-value" colspan="2">--</td>
-                </tr>
-            </tbody>
-        </table>
+  <h2 class="section-title">Portfolio Analysis Results</h2>
+
+  <!-- --------------------------- Metrics summary --------------------------- -->
+  <div class="metrics-table">
+    <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;  padding:10px; border-bottom:2px solid #DFE1E6;">Metric</th>
+          <th style="text-align:right; padding:10px; border-bottom:2px solid #DFE1E6;">Portfolio</th>
+          <th id="benchmark-header" style="text-align:right; padding:10px; border-bottom:2px solid #DFE1E6;">Benchmark (SPY)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set rows = [
+          ('CAGR','cagr'),('Volatility','volatility'),('Sharpe Ratio','sharpe'),
+          ('Max Drawdown','max-drawdown'),('Max Drawdown Duration','max-drawdown-duration'),
+          ('Sortino Ratio','sortino-ratio'),('Calmar Ratio','calmar-ratio'),('Total Return','total-return'),
+          ('Rolling 12M Return','rolling-return'),('Rolling 12M Volatility','rolling-volatility'),
+          ('Best Month','best-month'),('Worst Month','worst-month'),('Time Period','period')
+        ] %}
+        {% for label, id in rows %}
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #DFE1E6;">{{ label }}</td>
+          <td id="{{ id }}-value" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          {% if id != 'period' %}
+          <td id="benchmark-{{ id }}-value" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          {% else %}
+          <td colspan="2" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Benchmark notice when benchmark ticker is also in the portfolio -->
+  <div id="benchmark-in-portfolio-notice" style="display:none; background:#E6EFFC; padding:10px 15px; border-radius:4px; margin-bottom:20px;">
+    <strong>Note:</strong> The benchmark (<span id="benchmark-name-notice">SPY</span>) is included in your portfolio. Separate metrics are shown based on the benchmark's performance alone.
+  </div>
+
+  <!-- Download CSV -->
+  <div style="margin:20px 0;">
+    <button id="download-returns-btn" class="btn btn-success" disabled>Download Returns Data (CSV)</button>
+  </div>
+
+  <!-- ------------------------------ Tab nav ------------------------------ -->
+  <div class="tabs">
+    <div class="tab active" data-tab="summary-tab">Summary</div>
+    <div class="tab" data-tab="allocation-tab">Allocation</div>
+    <div class="tab" data-tab="equity-curve-tab">Equity Curve</div>
+    <div class="tab" data-tab="drawdown-tab">Drawdown</div>
+    <div class="tab" data-tab="returns-tab" id="returns-tab-label">Annual Returns</div>
+    <div class="tab" data-tab="correlation-tab">Correlation</div>
+  </div>
+
+  <!-- --------------------------- Tab contents --------------------------- -->
+  <div id="summary-tab" class="tab-content active">
+    <div class="summary-container">
+      <h3>Portfolio Summary</h3>
+      <p>This tab provides an overview of your portfolio performance. Check other tabs for detailed analysis.</p>
+      <div id="summary-metrics" class="metrics-summary"></div>
     </div>
-    
-    <!-- Benchmark indicator for when benchmark is in the portfolio -->
-    <div id="benchmark-in-portfolio-notice" style="display: none; background-color: #E6EFFC; padding: 10px 15px; border-radius: 4px; margin-bottom: 20px;">
-        <strong>Note:</strong> The benchmark (<span id="benchmark-name-notice">SPY</span>) is included in your portfolio. Separate metrics are shown based on the benchmark's performance alone.
-    </div>
-    
-    <!-- Download Results Button -->
-    <div style="margin: 20px 0;">
-        <button id="download-returns-btn" class="btn btn-success" disabled>Download Returns Data (CSV)</button>
-    </div>
-    
-    <!-- Chart Tabs -->
-    <div class="tabs">
-        <div class="tab active" data-tab="summary-tab">Summary</div>
-        <div class="tab" data-tab="allocation-tab">Allocation</div>
-        <div class="tab" data-tab="equity-curve-tab">Equity Curve</div>
-        <div class="tab" data-tab="drawdown-tab">Drawdown</div>
-        <div class="tab" data-tab="returns-tab" id="returns-tab-label">Annual Returns</div>
-        <div class="tab" data-tab="correlation-tab">Correlation</div>
-    </div>
-    
-    <!-- Chart Containers -->
-    <div id="summary-tab" class="tab-content active">
-        <div class="summary-container">
-            <h3>Portfolio Summary</h3>
-            <p>This tab provides an overview of your portfolio performance. Check other tabs for detailed analysis.</p>
-            <div id="summary-metrics" class="metrics-summary"></div>
-        </div>
-    </div>
-    
-    <div id="allocation-tab" class="tab-content">
-        <div id="allocation-chart" class="chart-container"></div>
-        <div class="allocation-legend" id="allocation-legend"></div>
-    </div>
-    
-    <div id="equity-curve-tab" class="tab-content">
-        <div id="equity-chart" class="chart-container"></div>
-    </div>
-    
-    <div id="drawdown-tab" class="tab-content">
-        <div id="drawdown-chart" class="chart-container"></div>
-    </div>
-    
-    <div id="returns-tab" class="tab-content">
-        <div id="returns-chart" class="chart-container"></div>
-    </div>
-    
-    <div id="correlation-tab" class="tab-content">
-        <div id="correlation-chart" class="chart-container"></div>
-    </div>
+  </div>
+
+  <div id="allocation-tab" class="tab-content">
+    <div id="allocation-chart" class="chart-container"></div>
+    <div id="allocation-legend" class="allocation-legend"></div>
+  </div>
+
+  <div id="equity-curve-tab" class="tab-content">
+    <div id="equity-chart" class="chart-container"></div>
+  </div>
+
+  <div id="drawdown-tab" class="tab-content">
+    <div id="drawdown-chart" class="chart-container"></div>
+  </div>
+
+  <div id="returns-tab" class="tab-content">
+    <div id="returns-chart" class="chart-container"></div>
+  </div>
+
+  <div id="correlation-tab" class="tab-content">
+    <div id="correlation-chart" class="chart-container"></div>
+  </div>
 </section>
 {% endblock %}

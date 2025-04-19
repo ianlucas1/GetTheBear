@@ -1,35 +1,125 @@
 import os
 import logging
+import re # Import regex module
 from flask import Flask, render_template, request, jsonify, Response, current_app
 import pandas as pd
 import io
+from datetime import datetime
 from analytics import (
     fetch_portfolio_data,
     calculate_metrics,
     fetch_benchmark_data,
-    setup_cache_table,
 )
+# Import db object from models.py
+from models import db, CacheEntry
 
+# --- Helper Function for Input Validation ---
+# Define a regex for typical ticker symbols (adjust as needed)
+TICKER_REGEX = re.compile(r"^[A-Z0-9.-]+$")
 
+def validate_portfolio_input(data):
+    """Validates the input data for portfolio analysis.
+    
+    Args:
+        data (dict): The input data dictionary.
+        
+    Returns:
+        tuple: (validated_data, error_message) 
+               validated_data is None if validation fails.
+    """
+    tickers = data.get("tickers", [])
+    weights_str = data.get("weights", []) # Keep as strings initially for validation
+    start_date_str = data.get("start_date")
+    end_date_str = data.get("end_date")
+    # Use current_app config within validation if needed (like here for default)
+    benchmark_ticker = data.get("benchmark_ticker", current_app.config.get('BENCHMARK_TICKER', 'SPY')) 
+
+    # 1. Presence checks
+    if not tickers or not weights_str or not start_date_str or not end_date_str:
+        return None, "Missing required parameters (tickers, weights, start_date, end_date)."
+    
+    # 2. Length Match
+    if len(tickers) != len(weights_str):
+         return None, "Number of tickers must match number of weights."
+
+    # 3. Date Format and Range Validation
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        if start_date >= end_date:
+             return None, "Start date must be before end date."
+        # Optional: Add check for dates too far in the past/future if needed
+    except ValueError:
+        return None, "Invalid date format. Please use YYYY-MM-DD."
+
+    # 4. Weight Validation (Type, Range, Sum)
+    weights = []
+    try:
+        for w_str in weights_str:
+            weight = float(w_str)
+            if weight <= 0:
+                return None, "Weights must be positive numbers."
+            weights.append(weight)
+    except (ValueError, TypeError):
+        return None, "Invalid weight values. Please use numbers."
+        
+    weight_sum = sum(weights)
+    if abs(weight_sum - 100) > 0.05:
+        return None, f"Weights must sum to 100% - your total is {weight_sum:.1f}%."
+
+    # 5. Ticker Validation (Stricter Format)
+    validated_tickers = []
+    for ticker in tickers:
+        if not isinstance(ticker, str):
+             return None, f"Invalid ticker type provided: '{ticker}'."
+        
+        cleaned_ticker = ticker.strip().upper()
+        if not cleaned_ticker:
+             return None, "Ticker symbols cannot be empty."
+        
+        # Apply regex check
+        if not TICKER_REGEX.match(cleaned_ticker):
+             return None, f"Invalid ticker format: '{ticker}'. Only A-Z, 0-9, ., - allowed."
+        validated_tickers.append(cleaned_ticker)
+
+    # 6. Benchmark Ticker Cleaning & Validation
+    benchmark_ticker_raw = data.get("benchmark_ticker", current_app.config.get('BENCHMARK_TICKER', 'SPY'))
+    benchmark_ticker_cleaned = benchmark_ticker_raw.split(" (")[0].strip().upper()
+    if not benchmark_ticker_cleaned:
+         return None, "Benchmark ticker cannot be empty."
+    # Apply regex check to benchmark ticker
+    if not TICKER_REGEX.match(benchmark_ticker_cleaned):
+         return None, f"Invalid benchmark ticker format: '{benchmark_ticker_raw}'."
+
+    validated_data = {
+        "tickers": validated_tickers, # Use cleaned & validated tickers
+        "weights": weights,
+        "start_date": start_date_str, 
+        "end_date": end_date_str,
+        "benchmark_ticker": benchmark_ticker_cleaned, # Use cleaned & validated benchmark
+        "weights_normalized": [w / 100.0 for w in weights]
+    }
+    
+    return validated_data, None
+
+# --- Application Factory ---
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__, instance_relative_config=True)
 
     # --- Configuration ---
-    # Default configuration
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SESSION_SECRET", "dev-secret-key"), # Use a default for dev
+        SECRET_KEY=os.environ.get("SESSION_SECRET", "dev-secret-key"),
         BENCHMARK_TICKER=os.environ.get('BENCHMARK_TICKER', 'SPY'),
-        # Add other default configs here if needed
-        # e.g., DATABASE_URI=os.environ.get('DATABASE_URI')
+        # Configure SQLAlchemy Database URI from DATABASE_URL env var
+        SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL'),
+        # Optional: Disable modification tracking if not needed
+        SQLALCHEMY_TRACK_MODIFICATIONS=False 
     )
 
     if test_config is None:
-        # Load the instance config, if it exists, when not testing
-        # You could create an instance/config.py file
         app.config.from_pyfile('config.py', silent=True)
     else:
-        # Load the test config if passed in
         app.config.from_mapping(test_config)
 
     # --- Logging ---
@@ -46,14 +136,20 @@ def create_app(test_config=None):
 
     app.logger.info('Flask app created')
 
+    # --- Initialize Extensions ---
+    db.init_app(app) # Bind db object to the app
 
-    # --- Database / Cache Setup ---
-    try:
-        # Consider passing app context or config if setup_cache_table needs it
-        setup_cache_table()
-        app.logger.info("Cache table setup complete")
-    except Exception as e:
-        app.logger.error(f"Error setting up cache table: {str(e)}")
+    # --- Create Database Tables ---
+    # Check if DATABASE_URL is set before trying to create tables
+    if app.config['SQLALCHEMY_DATABASE_URI']:
+        with app.app_context():
+            try:
+                db.create_all() # Create tables based on models
+                app.logger.info("Database tables checked/created successfully.")
+            except Exception as e:
+                app.logger.error(f"Error creating database tables: {str(e)}")
+    else:
+        app.logger.warning("DATABASE_URL not set. Skipping database table creation.")
 
     # --- Register Error Handlers ---
     @app.errorhandler(400)
@@ -92,79 +188,45 @@ def create_app(test_config=None):
         """
         try:
             data = request.get_json()
+            if not data:
+                 return jsonify({"error": "Invalid JSON payload provided."}), 400
 
-            tickers = data.get("tickers", [])
-            weights = data.get("weights", [])
-            start_date = data.get("start_date")
-            end_date = data.get("end_date")
-            # Use current_app for config within request context
-            benchmark_ticker = data.get("benchmark_ticker", current_app.config['BENCHMARK_TICKER'])
-
-            # Validate inputs
-            if not tickers or not weights or not start_date or not end_date:
-                return jsonify({"error": "Missing required parameters"}), 400
-
-            if len(tickers) != len(weights):
-                return (
-                    jsonify({"error": "Number of tickers must match number of weights"}),
-                    400,
-                )
-
-            # Convert weights to float
-            try:
-                weights = [float(w) for w in weights]
-            except ValueError:
-                 return jsonify({"error": "Invalid weight values provided."}), 400
-            weight_sum = sum(weights)
-
-
-            # Check if weights sum to exactly 100% (with a small tolerance of 0.05%)
-            if abs(weight_sum - 100) > 0.05:
-                return (
-                    jsonify(
-                        {
-                            "error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"
-                        }
-                    ),
-                    400,
-                )
-
-            # Normalize weights to sum to 1 for calculations
-            weights = [w / 100.0 for w in weights]
-
-            # Clean up benchmark ticker
-            benchmark_ticker = benchmark_ticker.split(" (")[0].strip().upper()
+            # --- Use Validation Function --- 
+            validated_data, error_message = validate_portfolio_input(data)
+            if error_message:
+                 return jsonify({"error": error_message}), 400
+            
+            # Extract validated data
+            tickers = validated_data["tickers"]
+            weights_normalized = validated_data["weights_normalized"]
+            start_date = validated_data["start_date"]
+            end_date = validated_data["end_date"]
+            benchmark_ticker = validated_data["benchmark_ticker"]
+            # --- End Validation ---
 
             # Check if benchmark is in the portfolio
             benchmark_in_portfolio = False
             benchmark_index = -1
-
             for i, ticker in enumerate(tickers):
-                clean_ticker = ticker.split(" (")[0].strip().upper()
-                if clean_ticker == benchmark_ticker:
+                # Compare against already cleaned benchmark ticker
+                if ticker.split(" (")[0] == benchmark_ticker: 
                     benchmark_in_portfolio = True
                     benchmark_index = i
                     break
 
             current_app.logger.debug(
-                f"Analyzing portfolio: {tickers} with weights {weights} from {start_date} to {end_date}"
+                f"Analyzing portfolio: {tickers} with weights {weights_normalized} from {start_date} to {end_date}"
             )
             current_app.logger.debug(f"Using benchmark: {benchmark_ticker}")
 
-            # Fetch portfolio data
+            # Fetch portfolio data (use normalized weights)
             df_monthly, error_tickers, correlation_data = fetch_portfolio_data(
-                tickers, weights, start_date, end_date
+                tickers, weights_normalized, start_date, end_date
             )
 
             if error_tickers:
-                return (
-                    jsonify(
-                        {
-                            "error": f"Could not fetch data for the following tickers: {', '.join(error_tickers)}. Please verify they are valid."
-                        }
-                    ),
-                    400,
-                )
+                # Error message format refined during validation/fetching
+                return jsonify({"error": error_tickers}), 400 
 
             if df_monthly is None or df_monthly.empty:
                 return jsonify({"error": "Could not retrieve portfolio data"}), 400
@@ -173,20 +235,13 @@ def create_app(test_config=None):
             df_benchmark = None
             if not benchmark_in_portfolio:
                 df_benchmark, benchmark_error = fetch_benchmark_data(
-                    benchmark_ticker, start_date, end_date
+                    benchmark_ticker, start_date, end_date # Use cleaned benchmark ticker
                 )
-
                 if benchmark_error:
                     current_app.logger.warning(f"Could not fetch benchmark data: {benchmark_error}")
-                    return (
-                        jsonify(
-                            {
-                                "error": f"Could not fetch benchmark data for {benchmark_ticker}: {benchmark_error}"
-                            }
-                        ),
-                        400,
-                    )
-
+                    # Return specific error from fetch function
+                    return jsonify({"error": benchmark_error}), 400
+            
             # Calculate metrics for the portfolio
             metrics = calculate_metrics(df_monthly)
 
@@ -210,27 +265,18 @@ def create_app(test_config=None):
                 "monthly_returns": df_monthly["Monthly Return"].tolist(),
                 "benchmark_ticker": benchmark_ticker,
             }
-
-            # Add annual returns data
-            if "annual_returns" in metrics:
-                chart_data["annual_returns"] = metrics["annual_returns"]
-
-            # Add benchmark data to chart data if available
+            if "annual_returns" in metrics: chart_data["annual_returns"] = metrics["annual_returns"]
             if df_benchmark is not None and not df_benchmark.empty:
                 chart_data["benchmark_values"] = df_benchmark["Portfolio Value"].tolist()
                 chart_data["benchmark_drawdowns"] = df_benchmark["Drawdown"].tolist()
                 chart_data["benchmark_in_portfolio"] = False
                 if benchmark_metrics and "annual_returns" in benchmark_metrics:
-                    chart_data["benchmark_annual_returns"] = benchmark_metrics[
-                        "annual_returns"
-                    ]
+                    chart_data["benchmark_annual_returns"] = benchmark_metrics["annual_returns"]
             elif benchmark_in_portfolio:
                 chart_data["benchmark_in_portfolio"] = True
                 chart_data["benchmark_index"] = benchmark_index
                 if benchmark_metrics and "annual_returns" in benchmark_metrics:
-                    chart_data["benchmark_annual_returns"] = benchmark_metrics[
-                        "annual_returns"
-                    ]
+                    chart_data["benchmark_annual_returns"] = benchmark_metrics["annual_returns"]
 
             return jsonify(
                 {
@@ -260,53 +306,48 @@ def create_app(test_config=None):
         - benchmark_ticker: The benchmark ticker to use
         """
         try:
-            # Get query parameters
-            tickers = request.args.get("tickers", "").split(",")
-            weights_str = request.args.get("weights", "").split(",")
-            start_date = request.args.get("start_date")
-            end_date = request.args.get("end_date")
-            # Use current_app for config within request context
-            benchmark_ticker = request.args.get("benchmark_ticker", current_app.config['BENCHMARK_TICKER'])
+            # --- Use Validation Function (adapting for request.args) --- 
+            # Extract args into a dictionary matching validate_portfolio_input expectation
+            input_data = {
+                 "tickers": request.args.get("tickers", "").split(","),
+                 "weights": request.args.get("weights", "").split(","),
+                 "start_date": request.args.get("start_date"),
+                 "end_date": request.args.get("end_date"),
+                 "benchmark_ticker": request.args.get("benchmark_ticker") # Let default be handled inside
+            }
+             # Handle case where tickers/weights might be empty strings if args are missing
+            if input_data["tickers"] == ['']: input_data["tickers"] = []
+            if input_data["weights"] == ['']: input_data["weights"] = []
+            
+            validated_data, error_message = validate_portfolio_input(input_data)
+            if error_message:
+                 return jsonify({"error": error_message}), 400
 
-            # Validate inputs
-            if (
-                not tickers
-                or not weights_str
-                or not start_date
-                or not end_date
-                or tickers[0] == ""
-            ):
-                return jsonify({"error": "Missing required parameters"}), 400
+            # Extract validated data
+            tickers = validated_data["tickers"]
+            weights_normalized = validated_data["weights_normalized"]
+            start_date = validated_data["start_date"]
+            end_date = validated_data["end_date"]
+            benchmark_ticker = validated_data["benchmark_ticker"]
+            # --- End Validation ---
 
-            try:
-                weights = [float(w) for w in weights_str if w]
-            except ValueError:
-                return jsonify({"error": "Invalid weight values"}), 400
-
-            if len(tickers) != len(weights):
-                return jsonify({"error": "Number of tickers must match number of weights"}), 400
-
-            weight_sum = sum(weights)
-            if abs(weight_sum - 100) > 0.05:
-                 return jsonify({"error": f"Weights must sum to 100% - your total is {weight_sum:.1f}%"}), 400
-
-            # Normalize weights to sum to 1 for calculations
-            weights_normalized = [w / 100.0 for w in weights]
-            benchmark_ticker_cleaned = benchmark_ticker.split(" (")[0].strip().upper()
-
+            # Check if benchmark is in the portfolio
             benchmark_in_portfolio = any(
-                t.split(" (")[0].strip().upper() == benchmark_ticker_cleaned for t in tickers
+                t.split(" (")[0] == benchmark_ticker for t in tickers
             )
 
+            # Fetch portfolio data
             df_portfolio, error_tickers, _ = fetch_portfolio_data(
                 tickers, weights_normalized, start_date, end_date
             )
 
             if error_tickers:
-                current_app.logger.warning(f"Could not fetch data for: {error_tickers}") # Use app logger
+                current_app.logger.warning(f"Could not fetch data for CSV: {error_tickers}")
+                # Return error appropriately, maybe redirect or show message?
+                # For now, returning JSON error, though it's a GET request.
+                return jsonify({"error": error_tickers}), 400 
 
             if df_portfolio is None or df_portfolio.empty:
-                # Don't log warning if error_tickers already handled it
                 if not error_tickers:
                      current_app.logger.warning("Could not retrieve portfolio data for CSV download.")
                 return jsonify({"error": "Could not retrieve portfolio data"}), 400
@@ -315,24 +356,15 @@ def create_app(test_config=None):
             benchmark_data = None
             benchmark_error = None
             if benchmark_in_portfolio:
-                 # Find the benchmark ticker in the original list to fetch it alone
                  for i, ticker in enumerate(tickers):
-                     clean_ticker = ticker.split(" (")[0].strip().upper()
-                     if clean_ticker == benchmark_ticker_cleaned:
-                         # Fetch only the benchmark data
-                         benchmark_data, benchmark_error, _ = fetch_portfolio_data(
-                             [clean_ticker], [1.0], start_date, end_date
-                         )
-                         if benchmark_error:
-                             current_app.logger.warning(f"Could not fetch benchmark data (in portfolio): {benchmark_error}")
-                         break # Found it
+                     clean_ticker = ticker.split(" (")[0]
+                     if clean_ticker == benchmark_ticker:
+                         benchmark_data, benchmark_error, _ = fetch_portfolio_data([clean_ticker], [1.0], start_date, end_date)
+                         if benchmark_error: current_app.logger.warning(f"Could not fetch benchmark data (in portfolio) for CSV: {benchmark_error}")
+                         break
             else:
-                benchmark_data, benchmark_error = fetch_benchmark_data(
-                    benchmark_ticker_cleaned, start_date, end_date
-                )
-                if benchmark_error:
-                    current_app.logger.warning(f"Could not fetch benchmark data: {benchmark_error}")
-
+                benchmark_data, benchmark_error = fetch_benchmark_data(benchmark_ticker, start_date, end_date)
+                if benchmark_error: current_app.logger.warning(f"Could not fetch benchmark data for CSV: {benchmark_error}")
 
             # Prepare CSV with monthly returns
             monthly_returns = pd.DataFrame(index=df_portfolio.index)
@@ -399,7 +431,7 @@ def create_app(test_config=None):
             csv_buffer.seek(0)
 
             # Return as downloadable file with the benchmark name in the filename
-            filename = f"portfolio_vs_{benchmark_ticker_cleaned}_returns.csv"
+            filename = f"portfolio_vs_{benchmark_ticker}_returns.csv"
 
             # Return as downloadable file
             return Response(

@@ -14,6 +14,7 @@ from analytics import (
 from models import db, CacheEntry
 from flask.cli import with_appcontext
 import click
+import math
 
 # --- Helper Function for Input Validation ---
 # Define a regex for typical ticker symbols (adjust as needed)
@@ -103,6 +104,18 @@ def validate_portfolio_input(data):
     }
     
     return validated_data, None
+
+def sanitize_for_json(obj):
+    """Recursively replace NaN/inf with None for JSON serialization."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
 
 # --- Application Factory ---
 def create_app(test_config=None):
@@ -280,15 +293,16 @@ def create_app(test_config=None):
                 if benchmark_metrics and "annual_returns" in benchmark_metrics:
                     chart_data["benchmark_annual_returns"] = benchmark_metrics["annual_returns"]
 
-            return jsonify(
-                {
-                    "metrics": metrics,
-                    "benchmark_metrics": benchmark_metrics,
-                    "chart_data": chart_data,
-                    "correlation_matrix": correlation_data,
-                    "success": True,
-                }
-            )
+            # return sanitized JSON response
+            response_data = {
+                "metrics": metrics,
+                "benchmark_metrics": benchmark_metrics,
+                "chart_data": chart_data,
+                "correlation_matrix": correlation_data,
+                "success": True,
+            }
+            response_data = sanitize_for_json(response_data)
+            return jsonify(response_data)
 
         except Exception as e:
             current_app.logger.exception("Error analyzing portfolio") # Log full error
@@ -447,12 +461,4 @@ def create_app(test_config=None):
             # Return generic message to user
             return jsonify({"error": "An unexpected error occurred while generating the returns CSV."}), 500
 
-    # Return the configured app instance
     return app
-
-# --- Main Execution ---
-if __name__ == "__main__":
-    app = create_app()
-    # Use debug=True only if FLASK_DEBUG env var is set
-    is_debug = os.environ.get('FLASK_DEBUG') == '1'
-    app.run(host="0.0.0.0", port=5000, debug=is_debug)

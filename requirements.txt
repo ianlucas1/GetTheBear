@@ -1,7 +1,9 @@
-flask
-pandas
-yfinance
-psycopg2-binary
-Flask-SQLAlchemy
-pytest
-pytest-mock
+Flask==2.3.3
+pandas==2.1.0
+numpy==1.26.0
+yfinance==0.2.31
+matplotlib==3.8.0
+pytest==7.4.2
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+pytest-mock==3.14.0

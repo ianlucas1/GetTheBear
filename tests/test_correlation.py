@@ -12,25 +12,26 @@ class TestCorrelationMatrix(unittest.TestCase):
     
     def test_matrix_properties(self):
         """Test that the correlation matrix has expected properties."""
-        # Create test data with known correlation properties
-        dates = pd.date_range(start='2020-01-01', end='2023-01-01', freq='ME')
-        np.random.seed(42) # For reproducibility
+        # Create the data with known correlation properties
+        np.random.seed(42)
+        date_rng = pd.date_range(start='2023-01-01', end='2023-03-01', freq='BM') # Use Business Month End
+        n_samples = len(date_rng)
 
         # Create base random returns for AAPL
-        aapl_returns = np.random.normal(0.01, 0.05, len(dates))
+        aapl_returns = np.random.normal(0.01, 0.05, n_samples)
         
         # Create MSFT returns positively correlated with AAPL
-        msft_returns = 0.8 * aapl_returns + np.random.normal(0.005, 0.02, len(dates))
+        msft_returns = 0.8 * aapl_returns + np.random.normal(0.005, 0.02, n_samples)
         
         # Create GOOG returns negatively correlated with AAPL
-        goog_returns = -0.6 * aapl_returns + np.random.normal(0.002, 0.03, len(dates))
+        goog_returns = -0.6 * aapl_returns + np.random.normal(0.002, 0.03, n_samples)
         
         # Combine into a DataFrame
         returns_df = pd.DataFrame({
             'AAPL': aapl_returns,
             'MSFT': msft_returns,
             'GOOG': goog_returns
-        }, index=dates)
+        }, index=date_rng)
         
         # Calculate the correlation matrix from this generated data
         correlation_matrix = returns_df.corr()

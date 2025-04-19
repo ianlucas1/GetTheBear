@@ -199,10 +199,7 @@ function addTickerRow() {
     });
 
     // Focus the new ticker input for better flow
-    tickerInput.focus(); 
-    
-    // Ensure total weight updates if a default row affects it (optional, good practice)
-    // updateWeightTotal(); // Call if adding a row might change the default/initial total
+    tickerInput.focus();
 }
 
 /**
@@ -270,7 +267,6 @@ function setupBenchmarkControl() {
             const topResults = results.slice(0, 10);
             
             // Build suggestions HTML -> Changed to safe DOM manipulation
-            // let suggestionsHTML = ''; 
             suggestionsContainer.innerHTML = ''; // Clear previous suggestions
 
             if (topResults.length > 0) {
@@ -308,21 +304,11 @@ function setupBenchmarkControl() {
                         customBenchmarkInput.removeAttribute('aria-activedescendant');
                     });
 
-                    // Append the new suggestion div to the container
                     suggestionsContainer.appendChild(suggestionDiv);
                 });
                 
-                // suggestionsContainer.innerHTML = suggestionsHTML; -> Replaced by appendChild loop
                 suggestionsContainer.style.display = 'block';
                 customBenchmarkInput.setAttribute('aria-expanded', 'true');
-                
-                // Add click event to suggestions -> Moved inside loop
-                /* 
-                const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
-                suggestionItems.forEach(item => {
-                    // Click listener moved to element creation above
-                });
-                */
             } else {
                 suggestionsContainer.style.display = 'none';
                 // Set aria-expanded to false when no results found

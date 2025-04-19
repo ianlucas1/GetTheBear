@@ -12,6 +12,8 @@ from analytics import (
 )
 # Import db object from models.py
 from models import db, CacheEntry
+from flask.cli import with_appcontext
+import click
 
 # --- Helper Function for Input Validation ---
 # Define a regex for typical ticker symbols (adjust as needed)

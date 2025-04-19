@@ -91,7 +91,8 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
                 logger.warning(f"No data found for ticker: {clean_ticker}")
                 error_tickers.append(ticker)
             else:
-                all_data[clean_ticker] = stock_data['Adj Close']
+                # Use 'Close' as yfinance auto-adjusts by default
+                all_data[clean_ticker] = stock_data['Close']
                 valid_tickers.append(clean_ticker)
         except Exception as e:
             logger.error(f"Error fetching data for ticker {ticker}: {e}")
@@ -214,17 +215,18 @@ def fetch_benchmark_data(ticker, start_date, end_date):
             logger.warning(error)
         else:
             # Resample to monthly
-            df_benchmark = stock_data[['Adj Close']].resample('M').last()
-            df_benchmark.rename(columns={'Adj Close': 'Portfolio Value'}, inplace=True)
+            # Use 'Close' as yfinance auto-adjusts by default
+            df_benchmark = stock_data[['Close']].resample('ME').last() # Use Month End frequency
+            df_benchmark.rename(columns={'Close': 'Portfolio Value'}, inplace=True)
             
             # Calculate monthly returns
-            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change()
+            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change(fill_method=None)
             
             # Add initial row for correct value calculation start
             initial_row = pd.DataFrame({'Portfolio Value': df_benchmark['Portfolio Value'].iloc[0] / (1 + df_benchmark['Monthly Return'].iloc[1]) if len(df_benchmark) > 1 and df_benchmark['Monthly Return'].iloc[1] is not None else df_benchmark['Portfolio Value'].iloc[0] }, index=[df_benchmark.index.min() - pd.Timedelta(days=1)])
             df_benchmark = pd.concat([initial_row, df_benchmark])
             df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill()
-            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change().fillna(0)
+            df_benchmark['Monthly Return'] = df_benchmark['Monthly Return'].fillna(0) # Explicitly fill NaNs after pct_change
 
             # Calculate Drawdown
             rolling_max = df_benchmark['Portfolio Value'].cummax()

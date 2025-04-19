@@ -720,11 +720,12 @@ select.form-control.btn-outline:hover {
 /* Example: Style focus state for custom elements like tabs */
 .tab:focus-visible {
   background-color: var(--hover);
-  /* Outline might already be sufficient, but can add specific background */
 }
 
-.suggestion-item:focus-visible {
-    /* Suggestion items are handled by JS changing background, 
-       but a visible outline could be added here too if desired */
-    /* outline: 2px solid var(--secondary); */ 
+/* Footer Styles */
+.footer-content {
+    text-align: center;
+    padding: 20px 0;
+    font-size: 14px;
+    color: #7A869A;
 }

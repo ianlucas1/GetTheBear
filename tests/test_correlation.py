@@ -5,7 +5,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 import pandas as pd
 import numpy as np
-# from analytics import fetch_portfolio_data -> We don't need fetch for this test
 from datetime import datetime, timedelta
 
 class TestCorrelationMatrix(unittest.TestCase):

@@ -1,5 +1,4 @@
 import logging
-import numpy as np
 import pandas as pd
 import yfinance as yf
 import math
@@ -13,11 +12,7 @@ from models import db, CacheEntry
 from flask import current_app
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-# Get DB connection details from environment variables
-DB_URL = os.environ.get("DATABASE_URL")
 
 # Cache duration (e.g., 1 day)
 CACHE_DURATION = timedelta(days=1)
@@ -30,136 +25,9 @@ def generate_cache_key(prefix, params):
     key_string = f"{prefix}:{sorted_params_str}"
     return hashlib.sha256(key_string.encode('utf-8')).hexdigest()
 
-def get_cached_stock_data(ticker, start_date, end_date, interval="1mo"):
-    """
-    Try to get stock data from cache
+# Old psycopg2 cache functions removed.
 
-    Returns:
-        DataFrame or None: The cached data if available, otherwise None
-    """
-    conn = psycopg2.connect(DB_URL)
-    try:
-        cursor = conn.cursor()
-
-        # Look for cached data
-        cursor.execute(
-            """
-            SELECT data FROM stock_price_cache
-            WHERE ticker = %s
-            AND start_date = %s
-            AND end_date = %s
-            AND interval = %s
-        """,
-            (ticker, start_date, end_date, interval),
-        )
-
-        result = cursor.fetchone()
-
-        if result:
-            logger.info(f"Cache hit for {ticker} from {start_date} to {end_date}")
-            # Convert JSON to DataFrame
-            json_data = result[0]
-
-            try:
-                # For records oriented JSON (new format)
-                df_records = pd.DataFrame(json.loads(json_data))
-
-                # Set the Date/index column as the index
-                if "Date" in df_records.columns:
-                    df_records.set_index("Date", inplace=True)
-                elif "index" in df_records.columns:
-                    df_records.set_index("index", inplace=True)
-                elif "date" in df_records.columns:
-                    df_records.set_index("date", inplace=True)
-
-                # Ensure index is datetime type
-                df_records.index = pd.to_datetime(df_records.index)
-
-                return df_records
-            except Exception as e:
-                logger.warning(
-                    f"Error parsing cached data with records format: {str(e)}"
-                )
-                try:
-                    # Try table oriented JSON (old format) as fallback
-                    df = pd.read_json(json_data, orient="table")
-                    df.index = pd.to_datetime(df.index)
-                    return df
-                except Exception as e2:
-                    logger.error(f"Error parsing cached data: {str(e2)}")
-                    return None
-        else:
-            logger.info(f"Cache miss for {ticker} from {start_date} to {end_date}")
-            return None
-    finally:
-        conn.close()
-
-
-def cache_stock_data(ticker, df, start_date, end_date, interval="1mo"):
-    """
-    Store stock data in cache
-
-    Args:
-        ticker (str): Stock ticker
-        df (DataFrame): Stock price data
-        start_date (str): Start date
-        end_date (str): End date
-        interval (str): Data interval
-    """
-    if df is None or df.empty:
-        logger.warning(f"Not caching empty data for {ticker}")
-        return
-
-    conn = psycopg2.connect(DB_URL)
-    try:
-        cursor = conn.cursor()
-
-        # Handle MultiIndex columns in dataframe (common with yfinance)
-        if isinstance(df.columns, pd.MultiIndex):
-            # Extract just the Close column for the ticker
-            if (ticker, "Close") in df.columns:
-                close_data = df[(ticker, "Close")].copy()
-                # Create a new DataFrame with just the date index and Close price
-                simple_df = pd.DataFrame({"Close": close_data}, index=df.index)
-                df_to_cache = simple_df
-            else:
-                # Try to get the first Close column
-                close_cols = [col for col in df.columns if col[1] == "Close"]
-                if close_cols:
-                    close_data = df[close_cols[0]].copy()
-                    simple_df = pd.DataFrame({"Close": close_data}, index=df.index)
-                    df_to_cache = simple_df
-                else:
-                    logger.warning(f"No Close column found for {ticker}, cannot cache")
-                    return
-        else:
-            # Single-level columns - use as is
-            df_to_cache = df.copy()
-
-        # Convert DataFrame to JSON (with records orient to avoid MultiIndex issues)
-        df_to_cache_reset = df_to_cache.reset_index()
-        json_data = df_to_cache_reset.to_json(date_format="iso", orient="records")
-
-        # Insert or update cache
-        cursor.execute(
-            """
-            INSERT INTO stock_price_cache (ticker, start_date, end_date, interval, data)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (ticker, start_date, end_date, interval) 
-            DO UPDATE SET data = %s, retrieved_at = CURRENT_TIMESTAMP
-        """,
-            (ticker, start_date, end_date, interval, json_data, json_data),
-        )
-
-        conn.commit()
-        logger.info(f"Cached data for {ticker} from {start_date} to {end_date}")
-    except Exception as e:
-        logger.error(f"Error caching data: {str(e)}")
-        conn.rollback()
-    finally:
-        conn.close()
-
-
+# --- Fetch Portfolio Data (with Caching) ---
 def fetch_portfolio_data(tickers, weights, start_date, end_date):
     """Fetch portfolio data, using cache if available and valid."""
     
@@ -278,9 +146,6 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
         "tickers": correlation_matrix.columns.tolist(),
         "matrix": correlation_matrix.values.tolist()
     } if not correlation_matrix.empty else None
-
-    # Add year column for CSV download convenience (done in app.py now)
-    # df_monthly['Year'] = df_monthly.index.year 
 
     # --- Cache Write Logic ---
     if use_cache and cache_key:

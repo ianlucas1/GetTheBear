@@ -5,8 +5,8 @@
 /* Root Variables and Fonts */
 :root {
   --primary: #0052CC;    /* Finance blue */
-  --secondary: #00875A;  /* Positive green */
-  --accent: #DE350B;     /* Negative red */
+  --secondary: #007A50;  /* Positive green (Adjusted for contrast) */
+  --accent: #CD350A;     /* Negative red (Adjusted for contrast) */
   --background: #FFFFFF; /* White */
   --text: #172B4D;       /* Dark blue-grey */
   --light-gray: #F4F5F7;
@@ -99,6 +99,20 @@ main {
   margin-bottom: 15px;
 }
 
+/* New Form Layout Classes */
+.form-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.form-col {
+  flex: 1;
+  min-width: 150px; /* Prevent columns from becoming too narrow */
+}
+
+/* End New Form Layout Classes */
+
 label {
   display: block;
   margin-bottom: 5px;
@@ -168,39 +182,27 @@ select {
 /* Position the total weight indicator */
 .ticker-control-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start; /* Align items to the start by default */
   align-items: center;
+  gap: 8px; /* Consistent gap */
   margin-top: 8px;
   margin-bottom: 15px;
-  padding-right: 10px;
+  flex-wrap: wrap; /* Allow wrapping */
 }
 
+/* Remove ID-specific layout styles if possible */
 #btn-equal-weights {
   min-width: 140px;
-  margin-right: 15px;
+  /* margin-right: 15px; -> Replaced by gap in parent or utility class */
 }
 
 #weight-sum {
   min-width: 120px;
+  margin-left: auto; /* Push weight sum to the right */
 }
 
-@media (max-width: 480px) {
-  .ticker-control-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-right: 0;
-  }
-  
-  #btn-equal-weights {
-    min-width: auto;
-    margin-right: 0;
-    margin-bottom: 8px;
-  }
-  
-  #weight-sum {
-    min-width: auto;
-  }
-}
+/* Remove old media query for ticker-control-row layout if flex-wrap handles it */
+/* @media (max-width: 480px) { ... } */
 
 @media (max-width: 768px) {
   .weights-controls {
@@ -222,12 +224,12 @@ select {
 }
 
 .weight-pill.valid {
-  color: var(--secondary);
+  color: var(--text);
   background-color: rgba(0, 135, 90, 0.1);
 }
 
 .weight-pill.invalid {
-  color: var(--accent);
+  color: var(--text);
   background-color: rgba(222, 53, 11, 0.1);
 }
 
@@ -275,15 +277,16 @@ select.form-control.btn-outline:hover {
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
+  margin: 0; /* Reset default margins */
 }
 
 .btn-primary {
-  background-color: var(--primary);
-  color: white;
+  /* background-color: var(--primary); Already defined */
+  /* color: white; Already defined */
 }
 
 .btn-primary:hover {
-  background-color: #0044AA;
+  /* background-color: #0044AA; Already defined */
 }
 
 .btn-secondary {
@@ -362,7 +365,7 @@ select.form-control.btn-outline:hover {
 
 .benchmark-value {
   font-size: 14px;
-  color: #6B778C;
+  color: #5E6C84;
   font-family: 'Roboto Mono', monospace;
   margin-bottom: 5px;
 }
@@ -400,7 +403,7 @@ select.form-control.btn-outline:hover {
 
 /* Error Message */
 .error-message {
-  color: var(--accent);
+  color: #B02A09;
   background-color: #FFE9E6;
   padding: 15px;
   border-radius: 4px;
@@ -414,14 +417,49 @@ select.form-control.btn-outline:hover {
 }
 
 /* Metrics Table */
+.metrics-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.metrics-table th,
+.metrics-table td {
+  padding: 8px; /* Base padding */
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle; /* Align text vertically */
+}
+
+.metrics-table th {
+  padding: 10px 8px; /* Slightly more padding for headers */
+  border-bottom-width: 2px; /* Thicker bottom border for header */
+  font-weight: 600; /* Make headers bold */
+}
+
 .metrics-table td.value-cell {
-  text-align: right;
+  /* text-align: right; -> Moved to utility class */
   font-family: 'Roboto Mono', monospace;
   font-weight: 500;
 }
 
-.text-end {
-  text-align: right !important;
+/* Alignment utility classes (if not already present) */
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* Benchmark Notice Box */
+#benchmark-in-portfolio-notice.notice-box {
+  display: none; /* Initially hidden */
+  background-color: #E6EFFC; /* Light blue background */
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #B3D4FF; /* Add a subtle border */
+  color: #0044AA; /* Darker blue for contrast */
+}
+
+/* Download Button Container */
+.download-button-container {
+  margin: 20px 0;
 }
 
 /* Tabs */
@@ -626,8 +664,67 @@ select.form-control.btn-outline:hover {
   }
 }
 
+/* Utility Classes */
+.mr-8 {
+  margin-right: 8px; /* Remove important */
+}
+
+/* Screen Reader Only - for visually hiding labels */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Remove the duplicate/overriding ticker-control-row at the end */
+/*
 .ticker-control-row {
     display: flex !important;
     justify-content: space-between;
     align-items: center;
+}
+*/
+
+/* Remove the duplicate btn-primary styles at the end */
+/*
+.btn-primary{background:#0057d6;border-color:#0057d6;color:#fff;}
+.btn-primary:hover{background:#0049b6;border-color:#0049b6;}
+*/
+
+/* Add visible focus styles for keyboard navigation */
+*:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 2px; /* Optional: match element border-radius */
+  box-shadow: 0 0 0 4px rgba(0, 82, 204, 0.3); /* Optional: add a softer glow */
+}
+
+/* Remove default outline when focus-visible is supported and not active (for mouse users) */
+*:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Adjust focus for specific elements if needed */
+/* Example: Tighter outline for small remove buttons */
+.remove-ticker:focus-visible {
+ outline-offset: 1px;
+}
+
+/* Example: Style focus state for custom elements like tabs */
+.tab:focus-visible {
+  background-color: var(--hover);
+  /* Outline might already be sufficient, but can add specific background */
+}
+
+.suggestion-item:focus-visible {
+    /* Suggestion items are handled by JS changing background, 
+       but a visible outline could be added here too if desired */
+    /* outline: 2px solid var(--secondary); */ 
 }

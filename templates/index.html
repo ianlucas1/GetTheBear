@@ -4,35 +4,48 @@
 <!-- ========================= Portfolio Input Section ========================= -->
 <section class="section">
   <h2 class="section-title">Portfolio Setup</h2>
-  <div class="error-message" id="error-message"></div>
+  <div class="error-message" id="error-message" aria-live="assertive"></div>
 
   <form id="analysis-form">
     <!-- ----------------------- Date range & benchmark ----------------------- -->
-    <div class="form-group" style="display:flex; gap:20px;">
-      <div style="flex:1;">
+    <div class="form-group form-row">
+      <div class="form-col">
         <label for="start-date">Start Date</label>
         <input type="date" id="start-date" name="start-date" required>
       </div>
-      <div style="flex:1;">
+      <div class="form-col">
         <label for="end-date">End Date</label>
         <input type="date" id="end-date" name="end-date" required>
       </div>
-      <div style="flex:1;">
+      <div class="form-col">
         <label for="benchmark-select">Benchmark</label>
         <div id="benchmark-container">
           <select id="benchmark-select" name="benchmark-select" class="form-control">
             <option value="SPY" selected>SPY (S&amp;P&nbsp;500)</option>
-            <option value="AOA">AOA (iShares Agg.)</option>
-            <option value="AOR">AOR (iShares Growth)</option>
-            <option value="AOM">AOM (iShares Moderate)</option>
-            <option value="AOK">AOK (iShares Conservative)</option>
-            <option value="VT">VT (Vanguard Total World)</option>
-            <option value="VXUS">VXUS (Vanguard ex‑US)</option>
+            <option value="AOA">AOA&nbsp;(iShares&nbsp;Agg.)</option>
+            <option value="AOR">AOR&nbsp;(iShares&nbsp;Growth)</option>
+            <option value="AOM">AOM&nbsp;(iShares&nbsp;Moderate)</option>
+            <option value="AOK">AOK&nbsp;(iShares&nbsp;Conservative)</option>
+            <option value="VT">VT&nbsp;(Vanguard&nbsp;Total&nbsp;World)</option>
+            <option value="VXUS">VXUS&nbsp;(Vanguard&nbsp;ex‑US)</option>
             <option value="custom">Custom&nbsp;Ticker…</option>
           </select>
           <div class="autocomplete-container">
-            <input id="custom-benchmark" name="custom-benchmark" placeholder="Enter ticker symbol" style="display:none;margin-top:5px;">
-            <div id="ticker-suggestions" class="suggestions-container"></div>
+            <input id="custom-benchmark" 
+                   name="custom-benchmark" 
+                   placeholder="Enter ticker symbol" 
+                   style="display:none;margin-top:5px;"
+                   role="combobox"
+                   aria-autocomplete="list"
+                   aria-haspopup="listbox"
+                   aria-expanded="false"
+                   aria-controls="ticker-suggestions">
+            <div id="ticker-suggestions" 
+                 class="suggestions-container"
+                 role="listbox"
+                 aria-label="Ticker suggestions">
+                 <!-- Dynamically populated suggestion items (role=option) go here -->
+            </div>
           </div>
         </div>
       </div>
@@ -44,28 +57,32 @@
       <div id="ticker-inputs" class="ticker-inputs"><!-- dynamic inputs --></div>
 
       <!-- Button left, badge right (flex row) -->
-      <div class="ticker-control-row" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-        <button id="btn-equal-weights" type="button" class="btn btn-outline">Equal Weights</button>
-        <div id="weight-sum" class="weight-pill">Total: 0 %</div>
+      <div class="ticker-control-row">
+        <button id="btn-equal-weights"
+                type="button"
+                class="btn btn-primary mr-8">
+          Equal Weights
+        </button>
+        <div id="weight-sum" class="weight-pill">Total: 0%</div>
       </div>
 
       <div class="weights-controls">
         <div class="weight-controls-row">
-          <button id="add-ticker" type="button" class="btn btn-secondary">Add Ticker</button>
+          <button id="add-ticker" type="button" class="btn btn-secondary">Add&nbsp;Ticker</button>
         </div>
       </div>
     </div>
 
     <!-- Analyse button -->
-    <div class="form-group" style="margin-top:20px;">
-      <button id="analyze-btn" type="submit" class="btn btn-primary">Analyze Portfolio</button>
+    <div class="form-group">
+      <button id="analyze-btn" type="submit" class="btn btn-primary">Analyze&nbsp;Portfolio</button>
     </div>
   </form>
 
   <!-- Loading indicator -->
   <div id="loader" class="loader">
-    <div class="spinner"></div>
-    <p>Retrieving data and analyzing portfolio…</p>
+    <div class="spinner" role="presentation" aria-hidden="true"></div>
+    <p role="status">Retrieving data and analyzing portfolio…</p>
   </div>
 </section>
 
@@ -75,12 +92,12 @@
 
   <!-- --------------------------- Metrics summary --------------------------- -->
   <div class="metrics-table">
-    <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <table>
       <thead>
         <tr>
-          <th style="text-align:left;  padding:10px; border-bottom:2px solid #DFE1E6;">Metric</th>
-          <th style="text-align:right; padding:10px; border-bottom:2px solid #DFE1E6;">Portfolio</th>
-          <th id="benchmark-header" style="text-align:right; padding:10px; border-bottom:2px solid #DFE1E6;">Benchmark (SPY)</th>
+          <th class="text-left">Metric</th>
+          <th class="text-right">Portfolio</th>
+          <th id="benchmark-header" class="text-right">Benchmark&nbsp;(SPY)</th>
         </tr>
       </thead>
       <tbody>
@@ -93,12 +110,12 @@
         ] %}
         {% for label, id in rows %}
         <tr>
-          <td style="padding:8px; border-bottom:1px solid #DFE1E6;">{{ label }}</td>
-          <td id="{{ id }}-value" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          <td>{{&nbsp;label&nbsp;}}</td>
+          <td id="{{ id }}-value" class="value-cell text-right">--</td>
           {% if id != 'period' %}
-          <td id="benchmark-{{ id }}-value" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          <td id="benchmark-{{ id }}-value" class="value-cell text-right">--</td>
           {% else %}
-          <td colspan="2" class="value-cell" style="text-align:right; padding:8px; border-bottom:1px solid #DFE1E6;">--</td>
+          <td colspan="2" class="value-cell text-right">--</td>
           {% endif %}
         </tr>
         {% endfor %}
@@ -107,27 +124,27 @@
   </div>
 
   <!-- Benchmark notice when benchmark ticker is also in the portfolio -->
-  <div id="benchmark-in-portfolio-notice" style="display:none; background:#E6EFFC; padding:10px 15px; border-radius:4px; margin-bottom:20px;">
+  <div id="benchmark-in-portfolio-notice" class="notice-box" aria-live="polite">
     <strong>Note:</strong> The benchmark (<span id="benchmark-name-notice">SPY</span>) is included in your portfolio. Separate metrics are shown based on the benchmark's performance alone.
   </div>
 
   <!-- Download CSV -->
-  <div style="margin:20px 0;">
-    <button id="download-returns-btn" class="btn btn-success" disabled>Download Returns Data (CSV)</button>
+  <div class="download-button-container">
+    <button id="download-returns-btn" class="btn btn-success" disabled>Download Returns Data&nbsp;(CSV)</button>
   </div>
 
   <!-- ------------------------------ Tab nav ------------------------------ -->
-  <div class="tabs">
-    <div class="tab active" data-tab="summary-tab">Summary</div>
-    <div class="tab" data-tab="allocation-tab">Allocation</div>
-    <div class="tab" data-tab="equity-curve-tab">Equity Curve</div>
-    <div class="tab" data-tab="drawdown-tab">Drawdown</div>
-    <div class="tab" data-tab="returns-tab" id="returns-tab-label">Annual Returns</div>
-    <div class="tab" data-tab="correlation-tab">Correlation</div>
+  <div class="tabs" role="tablist">
+    <div class="tab active" role="tab" id="summary-tab-button" aria-controls="summary-tab" aria-selected="true" data-tab="summary-tab">Summary</div>
+    <div class="tab" role="tab" id="allocation-tab-button" aria-controls="allocation-tab" aria-selected="false" data-tab="allocation-tab">Allocation</div>
+    <div class="tab" role="tab" id="equity-curve-tab-button" aria-controls="equity-curve-tab" aria-selected="false" data-tab="equity-curve-tab">Equity&nbsp;Curve</div>
+    <div class="tab" role="tab" id="drawdown-tab-button" aria-controls="drawdown-tab" aria-selected="false" data-tab="drawdown-tab">Drawdown</div>
+    <div class="tab" role="tab" id="returns-tab-button" aria-controls="returns-tab" aria-selected="false" data-tab="returns-tab">Annual&nbsp;Returns</div>
+    <div class="tab" role="tab" id="correlation-tab-button" aria-controls="correlation-tab" aria-selected="false" data-tab="correlation-tab">Correlation</div>
   </div>
 
   <!-- --------------------------- Tab contents --------------------------- -->
-  <div id="summary-tab" class="tab-content active">
+  <div id="summary-tab" class="tab-content active" role="tabpanel" aria-labelledby="summary-tab-button">
     <div class="summary-container">
       <h3>Portfolio Summary</h3>
       <p>This tab provides an overview of your portfolio performance. Check other tabs for detailed analysis.</p>
@@ -135,24 +152,24 @@
     </div>
   </div>
 
-  <div id="allocation-tab" class="tab-content">
+  <div id="allocation-tab" class="tab-content" role="tabpanel" aria-labelledby="allocation-tab-button">
     <div id="allocation-chart" class="chart-container"></div>
     <div id="allocation-legend" class="allocation-legend"></div>
   </div>
 
-  <div id="equity-curve-tab" class="tab-content">
+  <div id="equity-curve-tab" class="tab-content" role="tabpanel" aria-labelledby="equity-curve-tab-button">
     <div id="equity-chart" class="chart-container"></div>
   </div>
 
-  <div id="drawdown-tab" class="tab-content">
+  <div id="drawdown-tab" class="tab-content" role="tabpanel" aria-labelledby="drawdown-tab-button">
     <div id="drawdown-chart" class="chart-container"></div>
   </div>
 
-  <div id="returns-tab" class="tab-content">
+  <div id="returns-tab" class="tab-content" role="tabpanel" aria-labelledby="returns-tab-button">
     <div id="returns-chart" class="chart-container"></div>
   </div>
 
-  <div id="correlation-tab" class="tab-content">
+  <div id="correlation-tab" class="tab-content" role="tabpanel" aria-labelledby="correlation-tab-button">
     <div id="correlation-chart" class="chart-container"></div>
   </div>
 </section>

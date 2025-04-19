@@ -168,18 +168,26 @@ function updateWeightTotal() {
  */
 function addTickerRow() {
     const tickerInputsContainer = document.getElementById('ticker-inputs');
+    // Determine the index for unique IDs (based on how many rows already exist)
+    const rowIndex = tickerInputsContainer.querySelectorAll('.ticker-item').length;
     
     const tickerRow = document.createElement('div');
     tickerRow.className = 'ticker-item';
     
+    // Generate unique IDs for this row's inputs
+    const tickerInputId = `ticker-input-${rowIndex}`;
+    const weightInputId = `weight-input-${rowIndex}`;
+
     tickerRow.innerHTML = `
         <div class="ticker-symbol">
-            <input type="text" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
+            <label for="${tickerInputId}" class="sr-only">Ticker Symbol Row ${rowIndex + 1}</label>
+            <input type="text" id="${tickerInputId}" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
         </div>
         <div class="ticker-weight">
-            <input type="number" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
+            <label for="${weightInputId}" class="sr-only">Weight Row ${rowIndex + 1}</label>
+            <input type="number" id="${weightInputId}" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
         </div>
-        <button type="button" class="btn btn-danger btn-sm remove-ticker">×</button>
+        <button type="button" class="btn btn-danger btn-sm remove-ticker" aria-label="Remove Ticker Row ${rowIndex + 1}">×</button>
     `;
     
     tickerInputsContainer.appendChild(tickerRow);
@@ -189,6 +197,12 @@ function addTickerRow() {
     tickerInput.addEventListener('blur', function() {
         this.value = this.value.toUpperCase();
     });
+
+    // Focus the new ticker input for better flow
+    tickerInput.focus(); 
+    
+    // Ensure total weight updates if a default row affects it (optional, good practice)
+    // updateWeightTotal(); // Call if adding a row might change the default/initial total
 }
 
 /**
@@ -243,6 +257,9 @@ function setupBenchmarkControl() {
             
             if (query.length < 1) {
                 suggestionsContainer.style.display = 'none';
+                // Ensure aria-expanded is false when input is cleared
+                customBenchmarkInput.setAttribute('aria-expanded', 'false');
+                customBenchmarkInput.removeAttribute('aria-activedescendant');
                 return;
             }
             
@@ -256,10 +273,14 @@ function setupBenchmarkControl() {
             let suggestionsHTML = '';
             
             if (topResults.length > 0) {
-                topResults.forEach(result => {
+                topResults.forEach((result, index) => {
                     const item = result.item;
+                    // Add role="option" and a unique ID to each suggestion
                     suggestionsHTML += `
-                        <div class="suggestion-item" data-ticker="${item.ticker}">
+                        <div class="suggestion-item" 
+                             role="option" 
+                             id="suggestion-${index}" 
+                             data-ticker="${item.ticker}">
                             <span class="suggestion-ticker">${item.ticker}</span>
                             <span class="suggestion-name">${item.name}</span>
                         </div>
@@ -268,6 +289,8 @@ function setupBenchmarkControl() {
                 
                 suggestionsContainer.innerHTML = suggestionsHTML;
                 suggestionsContainer.style.display = 'block';
+                // Set aria-expanded to true when suggestions are shown
+                customBenchmarkInput.setAttribute('aria-expanded', 'true');
                 
                 // Add click event to suggestions
                 const suggestionItems = suggestionsContainer.querySelectorAll('.suggestion-item');
@@ -277,12 +300,58 @@ function setupBenchmarkControl() {
                         const name = this.querySelector('.suggestion-name').textContent;
                         customBenchmarkInput.value = `${ticker} (${name})`;
                         suggestionsContainer.style.display = 'none';
+                        // Set aria-expanded to false when a suggestion is clicked
+                        customBenchmarkInput.setAttribute('aria-expanded', 'false');
+                        customBenchmarkInput.removeAttribute('aria-activedescendant');
                     });
                 });
             } else {
                 suggestionsContainer.style.display = 'none';
+                // Set aria-expanded to false when no results found
+                customBenchmarkInput.setAttribute('aria-expanded', 'false');
+                customBenchmarkInput.removeAttribute('aria-activedescendant');
             }
         });
+        
+        // Add keydown listener for arrow navigation and Enter/Escape
+        let activeSuggestionIndex = -1;
+        customBenchmarkInput.addEventListener('keydown', function(e) {
+            const suggestions = suggestionsContainer.querySelectorAll('.suggestion-item');
+            if (suggestions.length === 0 || suggestionsContainer.style.display === 'none') return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault(); // Prevent cursor move
+                activeSuggestionIndex = (activeSuggestionIndex + 1) % suggestions.length;
+                updateActiveSuggestion(suggestions, activeSuggestionIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault(); // Prevent cursor move
+                activeSuggestionIndex = (activeSuggestionIndex - 1 + suggestions.length) % suggestions.length;
+                updateActiveSuggestion(suggestions, activeSuggestionIndex);
+            } else if (e.key === 'Enter') {
+                if (activeSuggestionIndex >= 0) {
+                    e.preventDefault(); // Prevent form submission if suggestion selected
+                    suggestions[activeSuggestionIndex].click(); // Trigger click event on active suggestion
+                    activeSuggestionIndex = -1; // Reset index
+                }
+            } else if (e.key === 'Escape') {
+                suggestionsContainer.style.display = 'none';
+                customBenchmarkInput.setAttribute('aria-expanded', 'false');
+                customBenchmarkInput.removeAttribute('aria-activedescendant');
+                activeSuggestionIndex = -1; // Reset index
+            }
+        });
+
+        // Helper function to update ARIA and visual state of suggestions
+        function updateActiveSuggestion(suggestions, index) {
+            suggestions.forEach((item, i) => {
+                if (i === index) {
+                    item.style.backgroundColor = 'var(--hover)'; // Use hover color for highlight
+                    customBenchmarkInput.setAttribute('aria-activedescendant', item.id);
+                } else {
+                    item.style.backgroundColor = ''; // Remove background color
+                }
+            });
+        }
     }
     
     // Handle switching between dropdown and custom input
@@ -295,6 +364,9 @@ function setupBenchmarkControl() {
             customBenchmarkInput.style.display = 'none';
             customBenchmarkInput.required = false;
             suggestionsContainer.style.display = 'none';
+            // Ensure ARIA state is reset when switching away from custom
+            customBenchmarkInput.setAttribute('aria-expanded', 'false');
+            customBenchmarkInput.removeAttribute('aria-activedescendant');
         }
     });
     
@@ -303,14 +375,23 @@ function setupBenchmarkControl() {
         this.value = this.value.toUpperCase();
         // Hide suggestions when focus is lost
         setTimeout(() => {
-            suggestionsContainer.style.display = 'none';
-        }, 200); // Small delay to allow click on suggestion
+            // Check if focus is still within the container before hiding
+            if (!suggestionsContainer.contains(document.activeElement)) {
+                suggestionsContainer.style.display = 'none';
+                // Set aria-expanded to false on blur
+                customBenchmarkInput.setAttribute('aria-expanded', 'false');
+                customBenchmarkInput.removeAttribute('aria-activedescendant');
+            }
+        }, 150); // Slightly shorter delay
     });
     
     // Close suggestions when clicking outside
     document.addEventListener('click', function(e) {
         if (!customBenchmarkInput.contains(e.target) && !suggestionsContainer.contains(e.target)) {
             suggestionsContainer.style.display = 'none';
+            // Set aria-expanded to false on outside click
+            customBenchmarkInput.setAttribute('aria-expanded', 'false');
+            customBenchmarkInput.removeAttribute('aria-activedescendant');
         }
     });
 }
@@ -335,18 +416,25 @@ function setupAnalysisForm() {
     });
     
     // Tab switching
-    const tabs = document.querySelectorAll('.tab');
+    const tablist = document.querySelector('.tabs[role="tablist"]');
+    const tabs = tablist ? tablist.querySelectorAll('.tab[role="tab"]') : [];
+
     tabs.forEach(tab => {
         tab.addEventListener('click', function() {
-            // Remove active class from all tabs
-            tabs.forEach(t => t.classList.remove('active'));
+            // Find the previously selected tab and set aria-selected to false
+            const previousSelectedTab = tablist.querySelector('.tab[aria-selected="true"]');
+            if (previousSelectedTab) {
+                previousSelectedTab.classList.remove('active');
+                previousSelectedTab.setAttribute('aria-selected', 'false');
+            }
             
-            // Add active class to clicked tab
+            // Set aria-selected to true on the clicked tab
             this.classList.add('active');
+            this.setAttribute('aria-selected', 'true');
             
             // Show corresponding content
             const tabId = this.getAttribute('data-tab');
-            document.querySelectorAll('.tab-content').forEach(content => {
+            document.querySelectorAll('.tab-content[role="tabpanel"]').forEach(content => {
                 content.classList.remove('active');
             });
             document.getElementById(tabId).classList.add('active');

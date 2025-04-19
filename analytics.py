@@ -4,8 +4,13 @@ import pandas as pd
 import yfinance as yf
 import math
 import os
-import psycopg2
 import json
+import hashlib
+from datetime import datetime, timedelta, timezone
+
+# Import db stuff from models and Flask app context
+from models import db, CacheEntry
+from flask import current_app
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,34 +19,16 @@ logger = logging.getLogger(__name__)
 # Get DB connection details from environment variables
 DB_URL = os.environ.get("DATABASE_URL")
 
+# Cache duration (e.g., 1 day)
+CACHE_DURATION = timedelta(days=1)
 
-def setup_cache_table():
-    """
-    Create a table to cache stock price data
-    """
-    conn = psycopg2.connect(DB_URL)
-    try:
-        cursor = conn.cursor()
-
-        # Create table for stock price cache
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS stock_price_cache (
-                ticker TEXT NOT NULL,
-                start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
-                interval TEXT NOT NULL,
-                data JSONB NOT NULL,
-                retrieved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (ticker, start_date, end_date, interval)
-            )
-        """
-        )
-
-        conn.commit()
-    finally:
-        conn.close()
-
+# --- Helper Function for Cache Key ---
+def generate_cache_key(prefix, params):
+    """Generates a deterministic cache key (SHA256 hash)."""
+    # Sort params dict by key for consistent hashing
+    sorted_params_str = json.dumps(params, sort_keys=True)
+    key_string = f"{prefix}:{sorted_params_str}"
+    return hashlib.sha256(key_string.encode('utf-8')).hexdigest()
 
 def get_cached_stock_data(ticker, start_date, end_date, interval="1mo"):
     """
@@ -174,440 +161,346 @@ def cache_stock_data(ticker, df, start_date, end_date, interval="1mo"):
 
 
 def fetch_portfolio_data(tickers, weights, start_date, end_date):
-    """
-    Fetch and process portfolio data.
+    """Fetch portfolio data, using cache if available and valid."""
+    
+    # Check if database is configured
+    use_cache = bool(current_app.config.get('SQLALCHEMY_DATABASE_URI'))
+    cache_entry = None
+    cache_key = None
 
-    Args:
-        tickers (list): List of stock ticker symbols
-        weights (list): List of portfolio weights corresponding to tickers
-        start_date (str): Start date in YYYY-MM-DD format
-        end_date (str): End date in YYYY-MM-DD format
-
-    Returns:
-        tuple: (DataFrame with monthly portfolio data, list of tickers with errors)
-    """
-    try:
-        # Clean up tickers (remove any "(Benchmark)" suffix)
-        clean_tickers = [ticker.split(" (")[0] for ticker in tickers]
-
-        # Create dictionary of weights with clean ticker names
-        weight_dict = dict(zip(clean_tickers, weights))
-
-        # Initialize DataFrame for all price data
-        df = pd.DataFrame()
-        error_tickers = []
-
-        # Fetch data for each ticker (potentially from cache)
-        for ticker in clean_tickers:
-            # Try to get from cache first
-            cached_data = get_cached_stock_data(ticker, start_date, end_date)
-
-            if cached_data is not None:
-                # We have cached data
-                if "Close" in cached_data.columns:
-                    df[ticker] = cached_data["Close"]
-            else:
-                # No cached data, fetch from Yahoo Finance
-                try:
-                    # Download single ticker data
-                    data = yf.download(
-                        ticker,
-                        start=start_date,
-                        end=end_date,
-                        interval="1mo",
-                        auto_adjust=False,
-                    )
-
-                    if data.empty:
-                        error_tickers.append(ticker)
-                        continue
-
-                    # Prefer Adj Close, but fall back to Close if not available
-                    if "Adj Close" in data.columns:
-                        df[ticker] = data["Adj Close"]
-                        # Create a copy with 'Close' column name for caching
-                        data_to_cache = data.copy()
-                        data_to_cache["Close"] = data["Adj Close"]
-                    else:
-                        df[ticker] = data["Close"]
-                        data_to_cache = data
-
-                    # Cache this data for future use
-                    cache_stock_data(ticker, data, start_date, end_date)
-
-                except Exception as ticker_error:
-                    logger.error(
-                        f"Error fetching data for {ticker}: {str(ticker_error)}"
-                    )
-                    error_tickers.append(ticker)
-
-        # Handle any error tickers
-        if error_tickers:
-            logger.warning(f"Could not fetch data for: {error_tickers}")
-            # Remove problematic tickers
-            for ticker in error_tickers:
-                if ticker in clean_tickers:
-                    clean_tickers.remove(ticker)
-
-                    # Find the corresponding weight in original list
-                    idx = clean_tickers.index(ticker) if ticker in clean_tickers else -1
-                    if idx >= 0 and idx < len(weights):
-                        weights.pop(idx)
-
-            # Recalculate weights if we still have valid tickers
-            if clean_tickers:
-                total_weight = sum(weights)
-                if total_weight > 0:
-                    weights = [w / total_weight for w in weights]
-                    weight_dict = dict(zip(clean_tickers, weights))
+    if use_cache:
+        try:
+            # Generate cache key
+            params = {"tickers": sorted(tickers), "weights": weights, "start": start_date, "end": end_date}
+            cache_key = generate_cache_key("portfolio", params)
+            
+            # Try fetching from cache
+            cache_entry = db.session.get(CacheEntry, cache_key)
+            if cache_entry:
+                # Check if cache entry is still valid
+                cache_age = datetime.now(timezone.utc) - cache_entry.created_at
+                if cache_age < CACHE_DURATION:
+                    logger.info(f"Cache hit for portfolio key: {cache_key}")
+                    # Return cached data (structure needs to match expected return)
+                    # Assuming cached data is a dict with keys: df_monthly_json, errors, correlation_json
+                    cached_data = cache_entry.data
+                    df_monthly = pd.read_json(cached_data['df_monthly_json'], orient='table')
+                    # Ensure index is DatetimeIndex
+                    df_monthly.index = pd.to_datetime(df_monthly.index)
+                    return df_monthly, cached_data['errors'], cached_data['correlation_json']
                 else:
-                    return None, error_tickers
+                    logger.info(f"Cache expired for portfolio key: {cache_key}")
+                    # Expired, proceed to fetch but we might delete old entry
+                    db.session.delete(cache_entry)
+                    db.session.commit() # Commit deletion
+                    cache_entry = None # Ensure we don't try to use it
             else:
-                return None, error_tickers
+                 logger.info(f"Cache miss for portfolio key: {cache_key}")
+        except Exception as e:
+            current_app.logger.error(f"Cache read error: {e}", exc_info=True)
+            # Proceed without cache if read fails
+            use_cache = False 
+            # Rollback any potential session changes from failed read/delete
+            db.session.rollback()
 
-        # Forward fill missing values (for holidays/weekends)
-        df = df.ffill()
+    # --- Fetching Logic (if cache miss or invalid) ---
+    logger.info(f"Fetching live data for portfolio: {tickers}")
+    all_data = pd.DataFrame()
+    error_tickers = []
+    valid_tickers = []
 
-        if df.empty:
-            return None, error_tickers
+    for ticker in tickers:
+        try:
+            # Clean ticker in case it has benchmark label
+            clean_ticker = ticker.split(" (")[0].strip()
+            if not clean_ticker:
+                error_tickers.append(ticker)
+                continue
+                
+            # Download data using yfinance
+            stock_data = yf.download(clean_ticker, start=start_date, end=end_date, progress=False)
+            if stock_data.empty:
+                logger.warning(f"No data found for ticker: {clean_ticker}")
+                error_tickers.append(ticker)
+            else:
+                all_data[clean_ticker] = stock_data['Adj Close']
+                valid_tickers.append(clean_ticker)
+        except Exception as e:
+            logger.error(f"Error fetching data for ticker {ticker}: {e}")
+            error_tickers.append(ticker)
 
-        # Calculate monthly returns for each asset
-        # Explicitly specify fill_method=None to address FutureWarning
-        monthly_returns = df.pct_change(fill_method=None).dropna()
+    # Check if any data was fetched successfully
+    if all_data.empty:
+        return None, error_tickers, None
 
-        # Store individual ticker returns in a separate DataFrame
-        df_ticker_returns = pd.DataFrame(index=monthly_returns.index)
-        for ticker in clean_tickers:
-            if ticker in monthly_returns.columns:
-                df_ticker_returns[ticker] = monthly_returns[ticker]
+    # --- Processing Logic ---
+    # Ensure weights match the successfully fetched tickers
+    valid_weights = []
+    original_ticker_map = {t.split(" (")[0].strip(): w for t, w in zip(tickers, weights)}
+    for vt in valid_tickers:
+        valid_weights.append(original_ticker_map.get(vt, 0)) # Default to 0 if something went wrong
+    # Renormalize valid_weights if some tickers failed? Or rely on initial validation?
+    # For now, assume initial validation passed and weights correspond to tickers list.
+    # We should use the weights corresponding to the *valid_tickers* only.
+    valid_weights_normalized = [w / sum(valid_weights) if sum(valid_weights) > 0 else 0 for w in valid_weights]
+    
+    # Resample to monthly data, using the last day's price
+    df_monthly = all_data.resample('M').last()
 
-        # Compute correlation matrix between ticker returns
-        correlation_matrix = df_ticker_returns.corr().round(2)
+    # Calculate monthly returns
+    df_monthly_returns = df_monthly.pct_change().dropna()
 
-        # Calculate portfolio monthly returns using weights
-        portfolio_monthly_returns = pd.Series(0, index=monthly_returns.index)
-        for ticker, weight in weight_dict.items():
-            if ticker in monthly_returns.columns:
-                portfolio_monthly_returns += monthly_returns[ticker] * weight
+    # Calculate weighted portfolio returns
+    portfolio_monthly_returns = (df_monthly_returns * valid_weights_normalized).sum(axis=1)
 
-        # Calculate cumulative portfolio value (starting with $1)
-        df_portfolio = pd.DataFrame(index=df.index)
-        df_portfolio["Monthly Return"] = portfolio_monthly_returns.reindex(
-            df.index
-        ).fillna(0)
-        df_portfolio["Portfolio Value"] = (1 + df_portfolio["Monthly Return"]).cumprod()
-
-        # Calculate drawdown
-        df_portfolio["Peak Value"] = df_portfolio["Portfolio Value"].cummax()
-        df_portfolio["Drawdown"] = (
-            df_portfolio["Portfolio Value"] / df_portfolio["Peak Value"]
-        ) - 1
-
-        # Keep annual return data for charts
-        df_portfolio["Year"] = df_portfolio.index.year
-
-        # Convert correlation matrix to nested dictionary format for JSON
-        # Also include text labels for each cell (rounded to 2 decimal places)
-        correlation_data = {
-            "tickers": list(correlation_matrix.index),
-            "matrix": correlation_matrix.values.tolist(),
-            "labels": correlation_matrix.round(2).values.tolist(),
-        }
-
-        return df_portfolio, error_tickers, correlation_data
-
-    except Exception as e:
-        logger.exception(f"Error fetching portfolio data: {str(e)}")
-        return None, tickers, None
-
-
-def calculate_metrics(df_portfolio, is_benchmark=False):
-    """
-    Calculate key portfolio performance metrics.
-
-    Args:
-        df_portfolio (DataFrame): Portfolio data with monthly returns and values
-        is_benchmark (bool): Whether metrics are for a benchmark in portfolio
-
-    Returns:
-        dict: Dictionary containing calculated metrics
-    """
-    try:
-        # Get total number of years
-        start_date = df_portfolio.index[0]
-        end_date = df_portfolio.index[-1]
-        years = (end_date - start_date).days / 365.25
-
-        # Starting and ending values
-        initial_value = df_portfolio["Portfolio Value"].iloc[0]
-        final_value = df_portfolio["Portfolio Value"].iloc[-1]
-
-        # CAGR (Compound Annual Growth Rate)
-        cagr = (final_value / initial_value) ** (1 / years) - 1
-
-        # Monthly returns
-        monthly_returns = df_portfolio["Monthly Return"].dropna()
-
-        # Annualized volatility
-        annualized_vol = monthly_returns.std() * np.sqrt(12)
-
-        # Sharpe ratio (assuming risk-free rate of 0 for simplicity)
-        avg_monthly_return = monthly_returns.mean()
-        monthly_return_std = monthly_returns.std()
-        sharpe_ratio = 0
-        if monthly_return_std > 0:
-            sharpe_ratio = (avg_monthly_return / monthly_return_std) * np.sqrt(12)
-
-        # Maximum drawdown
-        max_drawdown = df_portfolio["Drawdown"].min()
-
-        # Best and worst month
-        best_month = monthly_returns.max()
-        worst_month = monthly_returns.min()
-
-        # Total return
-        total_return = (final_value / initial_value) - 1
-
-        # Calculate annual returns for the chart
-        # Group by year and calculate annual returns
-        annual_returns = {}
-        if "Year" in df_portfolio.columns:
-            # Group by year and get first/last portfolio value for each year
-            annual_data = df_portfolio.groupby("Year")["Portfolio Value"].agg(
-                ["first", "last"]
-            )
-
-            # Calculate annual returns
-            for year, row in annual_data.iterrows():
-                annual_return = (row["last"] / row["first"]) - 1
-                annual_returns[int(year)] = annual_return
-
-        # --- NEW METRICS ---
-
-        # Downside (Sortino) ratio
-        # Calculate negative returns (below 0%)
-        negative_returns = monthly_returns[monthly_returns < 0]
-
-        # Calculate downside deviation (standard deviation of negative returns)
-        downside_deviation = 0
-        sortino_ratio = 0
-        if len(negative_returns) > 0:
-            downside_deviation = negative_returns.std() * np.sqrt(12)
-
-            # Calculate Sortino ratio (using 0% as minimum acceptable return)
-            if downside_deviation > 0:
-                sortino_ratio = avg_monthly_return * np.sqrt(12) / downside_deviation
-
-        # Calmar ratio (CAGR ÷ absolute max drawdown)
-        calmar_ratio = 0
-        if max_drawdown < 0:  # Ensure we don't divide by zero
-            calmar_ratio = cagr / abs(max_drawdown)
-
-        # Max drawdown duration calculation
-        max_drawdown_duration = 0
-        if "Drawdown" in df_portfolio.columns:
-            # Calculate drawdown durations
-            in_drawdown = False
-            current_drawdown_start = None
-            current_duration = 0
-            max_duration = 0
-
-            # Iterate through portfolio values
-            for date, row in df_portfolio.iterrows():
-                drawdown = row["Drawdown"]
-
-                # Start of a drawdown
-                if not in_drawdown and drawdown < 0:
-                    in_drawdown = True
-                    current_drawdown_start = date
-                # End of a drawdown
-                elif in_drawdown and drawdown >= 0:
-                    in_drawdown = False
-                    current_duration = (
-                        date - current_drawdown_start
-                    ).days / 30  # Duration in months
-                    max_duration = max(max_duration, current_duration)
-                    current_drawdown_start = None
-
-            # Check if we're still in a drawdown at the end
-            if in_drawdown:
-                current_duration = (
-                    end_date - current_drawdown_start
-                ).days / 30  # Duration in months
-                max_duration = max(max_duration, current_duration)
-
-            max_drawdown_duration = max_duration
-
-        # Rolling 12-month volatility
-        rolling_volatility = None
-        if len(monthly_returns) >= 12:
-            # Calculate rolling 12-month standard deviation
-            rolling_std = monthly_returns.rolling(window=12).std() * np.sqrt(12)
-            # Get the most recent value
-            rolling_volatility = rolling_std.iloc[-1] if not rolling_std.empty else None
-
-        # Rolling 12-month returns
-        rolling_return = None
-        if len(df_portfolio) >= 12:
-            # Calculate rolling 12-month return
-            rolling_values = (
-                df_portfolio["Portfolio Value"]
-                .rolling(window=12)
-                .apply(
-                    lambda window: (
-                        (window.iloc[-1] / window.iloc[0]) - 1
-                        if len(window) == 12
-                        else None
-                    )
-                )
-            )
-            # Get the most recent value
-            rolling_return = (
-                rolling_values.iloc[-1] if not rolling_values.empty else None
-            )
-
-        # Format metrics for display
-        metrics = {
-            "cagr": format_percentage(cagr),
-            "volatility": format_percentage(annualized_vol),
-            "sharpe_ratio": format_number(sharpe_ratio),
-            "max_drawdown": format_percentage(max_drawdown),
-            "best_month": format_percentage(best_month),
-            "worst_month": format_percentage(worst_month),
-            "total_return": format_percentage(total_return),
-            "years": format_number(years, 1),
-            "annual_returns": annual_returns,  # Annual returns for chart
-            # New metrics
-            "sortino_ratio": format_number(sortino_ratio),
-            "calmar_ratio": format_number(calmar_ratio),
-            "max_drawdown_duration": f"{format_number(max_drawdown_duration, 1)} months",
-            "rolling_volatility": (
-                format_percentage(rolling_volatility)
-                if rolling_volatility is not None
-                else "N/A"
-            ),
-            "rolling_return": (
-                format_percentage(rolling_return)
-                if rolling_return is not None
-                else "N/A"
-            ),
-        }
-
-        return metrics
-
-    except Exception as e:
-        logger.exception(f"Error calculating metrics: {str(e)}")
-        return {
-            "cagr": "N/A",
-            "volatility": "N/A",
-            "sharpe_ratio": "N/A",
-            "max_drawdown": "N/A",
-            "best_month": "N/A",
-            "worst_month": "N/A",
-            "total_return": "N/A",
-            "years": "N/A",
-            "annual_returns": {},
-            # New metrics with N/A values
-            "sortino_ratio": "N/A",
-            "calmar_ratio": "N/A",
-            "max_drawdown_duration": "N/A",
-            "rolling_volatility": "N/A",
-            "rolling_return": "N/A",
-        }
+    # Calculate cumulative portfolio value (starting at 1)
+    portfolio_cumulative_returns = (1 + portfolio_monthly_returns).cumprod()
+    
+    # Add Portfolio Value and Monthly Return to the main monthly dataframe
+    df_monthly['Portfolio Value'] = portfolio_cumulative_returns
+    df_monthly['Monthly Return'] = portfolio_monthly_returns
+    # Add initial row for correct value calculation start
+    initial_row = pd.DataFrame({'Portfolio Value': 1.0}, index=[df_monthly.index.min() - pd.Timedelta(days=1)])
+    df_monthly = pd.concat([initial_row, df_monthly])
+    df_monthly['Portfolio Value'] = df_monthly['Portfolio Value'].fillna(1.0)
+    # Forward fill other columns if needed, or handle NaNs appropriately
+    df_monthly = df_monthly.ffill()
+    df_monthly['Monthly Return'] = df_monthly['Portfolio Value'].pct_change().fillna(0)
 
 
-def format_percentage(value):
-    """Format a number as a percentage string."""
-    if value is None or math.isnan(value):
-        return "N/A"
-    return f"{value * 100:.2f}%"
+    # Calculate Drawdown
+    rolling_max = df_monthly['Portfolio Value'].cummax()
+    df_monthly['Drawdown'] = (df_monthly['Portfolio Value'] / rolling_max) - 1
 
+    # Calculate Correlation Matrix
+    correlation_matrix = df_monthly_returns.corr()
+    correlation_data = {
+        "tickers": correlation_matrix.columns.tolist(),
+        "matrix": correlation_matrix.values.tolist()
+    } if not correlation_matrix.empty else None
 
-def format_number(value, decimals=2):
-    """Format a number with specified decimal places."""
-    if value is None or math.isnan(value):
-        return "N/A"
-    return f"{value:.{decimals}f}"
+    # Add year column for CSV download convenience (done in app.py now)
+    # df_monthly['Year'] = df_monthly.index.year 
+
+    # --- Cache Write Logic ---
+    if use_cache and cache_key:
+        try:
+            # Prepare data for caching (convert DataFrame to JSON)
+            # Using 'table' orientation is generally robust for round-tripping
+            data_to_cache = {
+                'df_monthly_json': df_monthly.to_json(orient='table', date_format='iso'),
+                'errors': error_tickers,
+                'correlation_json': correlation_data
+            }
+            
+            new_entry = CacheEntry(id=cache_key, data=data_to_cache)
+            db.session.merge(new_entry) # Use merge to insert or update if key exists
+            db.session.commit()
+            logger.info(f"Cache written for portfolio key: {cache_key}")
+        except Exception as e:
+            current_app.logger.error(f"Cache write error: {e}", exc_info=True)
+            db.session.rollback() # Rollback on error
+
+    return df_monthly, error_tickers, correlation_data
 
 
 def fetch_benchmark_data(ticker, start_date, end_date):
-    """
-    Fetch benchmark data for comparison.
+    """Fetch benchmark data, using cache if available and valid."""
+    
+    use_cache = bool(current_app.config.get('SQLALCHEMY_DATABASE_URI'))
+    cache_entry = None
+    cache_key = None
 
-    Args:
-        ticker (str): Benchmark ticker symbol (e.g., 'SPY')
-        start_date (str): Start date in YYYY-MM-DD format
-        end_date (str): End date in YYYY-MM-DD format
-
-    Returns:
-        tuple: (DataFrame with monthly benchmark data, error message or None)
-    """
-    try:
-        # Clean up ticker (remove any "(Benchmark)" suffix)
-        clean_ticker = ticker.split(" (")[0]
-
-        # Try to get from cache first
-        cached_data = get_cached_stock_data(clean_ticker, start_date, end_date)
-
-        if cached_data is not None:
-            # We have cached data
-            if "Close" in cached_data.columns:
-                df = pd.DataFrame(cached_data["Close"])
-                df.columns = [clean_ticker]
+    if use_cache:
+        try:
+            params = {"ticker": ticker, "start": start_date, "end": end_date}
+            cache_key = generate_cache_key("benchmark", params)
+            cache_entry = db.session.get(CacheEntry, cache_key)
+            
+            if cache_entry:
+                cache_age = datetime.now(timezone.utc) - cache_entry.created_at
+                if cache_age < CACHE_DURATION:
+                    logger.info(f"Cache hit for benchmark key: {cache_key}")
+                    # Assuming cached data is dict: {df_json: ..., error: ...}
+                    cached_data = cache_entry.data
+                    df_benchmark = pd.read_json(cached_data['df_json'], orient='table')
+                    df_benchmark.index = pd.to_datetime(df_benchmark.index)
+                    return df_benchmark, cached_data['error']
+                else:
+                    logger.info(f"Cache expired for benchmark key: {cache_key}")
+                    db.session.delete(cache_entry)
+                    db.session.commit()
+                    cache_entry = None
             else:
-                return None, f"Invalid cached data format for {clean_ticker}"
+                logger.info(f"Cache miss for benchmark key: {cache_key}")
+        except Exception as e:
+            current_app.logger.error(f"Benchmark cache read error: {e}", exc_info=True)
+            use_cache = False
+            db.session.rollback()
+
+    # --- Fetching Logic ---
+    logger.info(f"Fetching live data for benchmark: {ticker}")
+    df_benchmark = None
+    error = None
+    try:
+        stock_data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        if stock_data.empty:
+            error = f"No data found for benchmark ticker: {ticker}"
+            logger.warning(error)
         else:
-            # No cached data, fetch from Yahoo Finance
-            try:
-                # Download benchmark data
-                data = yf.download(
-                    clean_ticker,
-                    start=start_date,
-                    end=end_date,
-                    interval="1mo",
-                    auto_adjust=True,
-                )
+            # Resample to monthly
+            df_benchmark = stock_data[['Adj Close']].resample('M').last()
+            df_benchmark.rename(columns={'Adj Close': 'Portfolio Value'}, inplace=True)
+            
+            # Calculate monthly returns
+            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change()
+            
+            # Add initial row for correct value calculation start
+            initial_row = pd.DataFrame({'Portfolio Value': df_benchmark['Portfolio Value'].iloc[0] / (1 + df_benchmark['Monthly Return'].iloc[1]) if len(df_benchmark) > 1 and df_benchmark['Monthly Return'].iloc[1] is not None else df_benchmark['Portfolio Value'].iloc[0] }, index=[df_benchmark.index.min() - pd.Timedelta(days=1)])
+            df_benchmark = pd.concat([initial_row, df_benchmark])
+            df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill()
+            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change().fillna(0)
 
-                if data.empty:
-                    return None, f"No data available for benchmark {clean_ticker}"
-
-                # Process data
-                df = pd.DataFrame(data["Close"])
-                df.columns = [clean_ticker]
-
-                # Cache this data for future use
-                cache_stock_data(clean_ticker, data, start_date, end_date)
-
-            except Exception as ticker_error:
-                logger.error(
-                    f"Error fetching data for benchmark {clean_ticker}: {str(ticker_error)}"
-                )
-                return None, str(ticker_error)
-
-        # Forward fill missing values
-        df = df.ffill()
-
-        # Calculate monthly returns with explicit fill_method=None
-        monthly_returns = df.pct_change(fill_method=None).dropna()
-
-        # Calculate cumulative value (starting with $1)
-        df_benchmark = pd.DataFrame(index=df.index)
-        df_benchmark["Monthly Return"] = (
-            monthly_returns[clean_ticker].reindex(df.index).fillna(0)
-        )
-        df_benchmark["Portfolio Value"] = (1 + df_benchmark["Monthly Return"]).cumprod()
-
-        # Calculate drawdown
-        df_benchmark["Peak Value"] = df_benchmark["Portfolio Value"].cummax()
-        df_benchmark["Drawdown"] = (
-            df_benchmark["Portfolio Value"] / df_benchmark["Peak Value"]
-        ) - 1
-
-        # Keep annual return data for charts
-        df_benchmark["Year"] = df_benchmark.index.year
-
-        return df_benchmark, None
+            # Calculate Drawdown
+            rolling_max = df_benchmark['Portfolio Value'].cummax()
+            df_benchmark['Drawdown'] = (df_benchmark['Portfolio Value'] / rolling_max) - 1
 
     except Exception as e:
-        logger.exception(f"Error fetching benchmark data: {str(e)}")
-        return None, str(e)
+        error = f"Error fetching benchmark data for {ticker}: {e}"
+        logger.error(error, exc_info=True)
+
+    # --- Cache Write Logic ---
+    if use_cache and cache_key and error is None and df_benchmark is not None:
+        try:
+            data_to_cache = {
+                'df_json': df_benchmark.to_json(orient='table', date_format='iso'),
+                'error': error # Store None if successful
+            }
+            new_entry = CacheEntry(id=cache_key, data=data_to_cache)
+            db.session.merge(new_entry)
+            db.session.commit()
+            logger.info(f"Cache written for benchmark key: {cache_key}")
+        except Exception as e:
+            current_app.logger.error(f"Benchmark cache write error: {e}", exc_info=True)
+            db.session.rollback()
+
+    return df_benchmark, error
+
+
+def calculate_metrics(df_monthly):
+    # ... (existing metric calculation logic) ...
+    # Ensure it handles potential NaNs or edge cases if needed
+    
+    if df_monthly is None or df_monthly.empty or len(df_monthly) < 2:
+        # Return default/NA values if not enough data
+        return {
+            'cagr': 'N/A', 'volatility': 'N/A', 'sharpe_ratio': 'N/A', 
+            'max_drawdown': 'N/A', 'best_month': 'N/A', 'worst_month': 'N/A',
+            'total_return': 'N/A', 'years': 0, 'sortino_ratio': 'N/A',
+            'calmar_ratio': 'N/A', 'max_drawdown_duration': 'N/A',
+            'rolling_volatility': 'N/A', 'rolling_return': 'N/A',
+            'annual_returns': {}
+        }
+        
+    # Ensure index is datetime
+    df_monthly.index = pd.to_datetime(df_monthly.index)
+
+    # Calculate number of years
+    start_date = df_monthly.index.min()
+    end_date = df_monthly.index.max()
+    years = (end_date - start_date).days / 365.25
+
+    # Ensure we have enough data points
+    if years <= 0 or len(df_monthly) <= 1:
+        years = 0 # Avoid division by zero
+
+    # Total Return
+    total_return = (df_monthly['Portfolio Value'].iloc[-1] / df_monthly['Portfolio Value'].iloc[0]) - 1
+
+    # CAGR
+    cagr = ((1 + total_return) ** (1 / years) - 1) if years > 0 else 0
+
+    # Monthly Returns for calculations (excluding potential initial row)
+    monthly_returns = df_monthly['Monthly Return'].iloc[1:]
+
+    # Volatility (Annualized Standard Deviation of Monthly Returns)
+    volatility = monthly_returns.std() * math.sqrt(12) if not monthly_returns.empty else 0
+
+    # Sharpe Ratio (Assume Risk-Free Rate = 0)
+    sharpe_ratio = (cagr / volatility) if volatility > 0 else 0
+
+    # Max Drawdown
+    max_drawdown = df_monthly['Drawdown'].min()
+
+    # Best/Worst Month
+    best_month = monthly_returns.max() if not monthly_returns.empty else 0
+    worst_month = monthly_returns.min() if not monthly_returns.empty else 0
+    
+    # Sortino Ratio
+    downside_returns = monthly_returns[monthly_returns < 0]
+    downside_deviation = downside_returns.std() * math.sqrt(12) if not downside_returns.empty else 0
+    sortino_ratio = (cagr / downside_deviation) if downside_deviation > 0 else 0
+    
+    # Calmar Ratio
+    calmar_ratio = (cagr / abs(max_drawdown)) if max_drawdown < 0 else 0
+
+    # Max Drawdown Duration
+    # Find periods where drawdown is active (value is less than 0)
+    drawdown_periods = df_monthly[df_monthly['Drawdown'] < 0]
+    max_drawdown_duration = 0
+    current_duration = 0
+    in_drawdown = False
+    for date, row in df_monthly.iterrows():
+        if row['Drawdown'] < 0:
+            if not in_drawdown:
+                in_drawdown = True
+                current_duration = 0
+            # Increment duration (approx monthly)
+            current_duration += 1 
+        else:
+            if in_drawdown:
+                in_drawdown = False
+                max_drawdown_duration = max(max_drawdown_duration, current_duration)
+    # Check if still in drawdown at the end
+    if in_drawdown:
+         max_drawdown_duration = max(max_drawdown_duration, current_duration)
+    # Convert approx months to more descriptive string (e.g., "X months")
+    max_drawdown_duration_str = f"{max_drawdown_duration} months" if max_drawdown_duration > 0 else "0 months"
+
+
+    # Rolling 12M Volatility (Annualized std dev of the last 12 monthly returns)
+    rolling_volatility = monthly_returns.tail(12).std() * math.sqrt(12) if len(monthly_returns) >= 12 else 0
+
+    # Rolling 12M Return (Compounded return over the last 12 months)
+    rolling_return = ((1 + monthly_returns.tail(12)).prod() - 1) if len(monthly_returns) >= 12 else 0
+    
+    # Annual Returns
+    annual_returns = {}
+    df_monthly['Year'] = df_monthly.index.year
+    for year, group in df_monthly.iloc[1:].groupby('Year'): # Exclude initial row
+        if not group.empty:
+            # Use portfolio value for more accurate annual compounding
+            year_start_value = group['Portfolio Value'].iloc[0] / (1 + group['Monthly Return'].iloc[0]) if len(group) > 0 else 1
+            year_end_value = group['Portfolio Value'].iloc[-1]
+            annual_return = (year_end_value / year_start_value) - 1
+            annual_returns[year] = f"{annual_return:.2%}"
+            
+    # Format results
+    metrics = {
+        'cagr': f"{cagr:.2%}",
+        'volatility': f"{volatility:.2%}",
+        'sharpe_ratio': f"{sharpe_ratio:.2f}",
+        'max_drawdown': f"{max_drawdown:.2%}",
+        'best_month': f"{best_month:.2%}",
+        'worst_month': f"{worst_month:.2%}",
+        'total_return': f"{total_return:.2%}",
+        'years': f"{years:.1f}",
+        'sortino_ratio': f"{sortino_ratio:.2f}",
+        'calmar_ratio': f"{calmar_ratio:.2f}",
+        'max_drawdown_duration': max_drawdown_duration_str,
+        'rolling_volatility': f"{rolling_volatility:.2%}",
+        'rolling_return': f"{rolling_return:.2%}",
+        'annual_returns': annual_returns
+    }
+
+    return metrics

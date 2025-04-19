@@ -450,9 +450,6 @@ def create_app(test_config=None):
     # Return the configured app instance
     return app
 
-def calculate_metrics(df_monthly):
-    # ... (existing metric calculation logic) ...
-
 # --- Main Execution ---
 if __name__ == "__main__":
     app = create_app()

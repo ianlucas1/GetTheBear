@@ -12,6 +12,8 @@ from analytics import (
 )
 # Import db object from models.py
 from models import db, CacheEntry
+from flask.cli import with_appcontext
+import click
 
 # --- Helper Function for Input Validation ---
 # Define a regex for typical ticker symbols (adjust as needed)
@@ -447,6 +449,9 @@ def create_app(test_config=None):
 
     # Return the configured app instance
     return app
+
+def calculate_metrics(df_monthly):
+    # ... (existing metric calculation logic) ...
 
 # --- Main Execution ---
 if __name__ == "__main__":

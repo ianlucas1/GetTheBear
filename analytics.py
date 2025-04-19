@@ -6,6 +6,7 @@ import os
 import json
 import hashlib
 from datetime import datetime, timedelta, timezone
+import io # Import io module
 
 # Import db stuff from models and Flask app context
 from models import db, CacheEntry
@@ -52,7 +53,8 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
                     # Return cached data (structure needs to match expected return)
                     # Assuming cached data is a dict with keys: df_monthly_json, errors, correlation_json
                     cached_data = cache_entry.data
-                    df_monthly = pd.read_json(cached_data['df_monthly_json'], orient='table')
+                    # Wrap JSON string in StringIO for pd.read_json
+                    df_monthly = pd.read_json(io.StringIO(cached_data['df_monthly_json']), orient='table')
                     # Ensure index is DatetimeIndex
                     df_monthly.index = pd.to_datetime(df_monthly.index)
                     return df_monthly, cached_data['errors'], cached_data['correlation_json']
@@ -114,7 +116,7 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
     valid_weights_normalized = [w / sum(valid_weights) if sum(valid_weights) > 0 else 0 for w in valid_weights]
     
     # Resample to monthly data, using the last day's price
-    df_monthly = all_data.resample('M').last()
+    df_monthly = all_data.resample('ME').last() # Use Month End frequency
 
     # Calculate monthly returns
     df_monthly_returns = df_monthly.pct_change().dropna()
@@ -187,9 +189,11 @@ def fetch_benchmark_data(ticker, start_date, end_date):
                 cache_age = datetime.now(timezone.utc) - cache_entry.created_at
                 if cache_age < CACHE_DURATION:
                     logger.info(f"Cache hit for benchmark key: {cache_key}")
+                    # Return cached data (structure needs to match expected return)
                     # Assuming cached data is dict: {df_json: ..., error: ...}
                     cached_data = cache_entry.data
-                    df_benchmark = pd.read_json(cached_data['df_json'], orient='table')
+                    # Wrap JSON string in StringIO for pd.read_json
+                    df_benchmark = pd.read_json(io.StringIO(cached_data['df_json']), orient='table')
                     df_benchmark.index = pd.to_datetime(df_benchmark.index)
                     return df_benchmark, cached_data['error']
                 else:
@@ -219,14 +223,30 @@ def fetch_benchmark_data(ticker, start_date, end_date):
             df_benchmark = stock_data[['Close']].resample('ME').last() # Use Month End frequency
             df_benchmark.rename(columns={'Close': 'Portfolio Value'}, inplace=True)
             
-            # Calculate monthly returns
-            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change(fill_method=None)
+            # Calculate monthly returns and fill NaNs immediately
+            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change(fill_method=None).fillna(0)
             
             # Add initial row for correct value calculation start
-            initial_row = pd.DataFrame({'Portfolio Value': df_benchmark['Portfolio Value'].iloc[0] / (1 + df_benchmark['Monthly Return'].iloc[1]) if len(df_benchmark) > 1 and df_benchmark['Monthly Return'].iloc[1] is not None else df_benchmark['Portfolio Value'].iloc[0] }, index=[df_benchmark.index.min() - pd.Timedelta(days=1)])
+            # Note: Calculation relies on the *original* first valid monthly return if available
+            # Let's calculate the initial value *before* adding the initial row and potentially overwriting the first return
+            first_valid_return_idx = df_benchmark['Monthly Return'].ne(0).idxmax() if not df_benchmark['Monthly Return'].eq(0).all() else None
+            initial_portfolio_value = 1.0 # Default initial value
+            if first_valid_return_idx is not None and first_valid_return_idx > df_benchmark.index[0]:
+                first_value = df_benchmark.loc[first_valid_return_idx, 'Portfolio Value']
+                first_return_scalar = df_benchmark.loc[first_valid_return_idx, 'Monthly Return'] # Should be scalar
+                # Ensure it's treated as scalar and compare
+                if isinstance(first_return_scalar, pd.Series):
+                    first_return_scalar = first_return_scalar.item() # Extract scalar if it's a Series
+                    
+                if first_return_scalar != -1: # Avoid division by zero if return is -100%
+                     initial_portfolio_value = first_value / (1 + first_return_scalar)
+
+            initial_row = pd.DataFrame({'Portfolio Value': initial_portfolio_value, 'Monthly Return': 0.0}, 
+                                     index=[df_benchmark.index.min() - pd.Timedelta(days=1)])
             df_benchmark = pd.concat([initial_row, df_benchmark])
-            df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill()
-            df_benchmark['Monthly Return'] = df_benchmark['Monthly Return'].fillna(0) # Explicitly fill NaNs after pct_change
+            df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill() # Fill potential gaps
+            # Monthly return is already calculated and filled
+            # df_benchmark['Monthly Return'] = df_benchmark['Monthly Return'].fillna(0) # Already done
 
             # Calculate Drawdown
             rolling_max = df_benchmark['Portfolio Value'].cummax()

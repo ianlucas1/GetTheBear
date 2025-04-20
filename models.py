@@ -1,5 +1,4 @@
 from flask_sqlalchemy import SQLAlchemy
-# from sqlalchemy.dialects.postgresql import JSONB -> No longer needed directly
 from sqlalchemy.types import JSON # Import generic JSON type
 from datetime import datetime, timezone
 

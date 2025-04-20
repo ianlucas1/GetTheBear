@@ -28,7 +28,9 @@ This is a Flask web application designed for analyzing stock portfolio performan
 
 3.  **Install dependencies:**
     ```bash
-    pip install -r requirements.txt
+    # Install runtime and development dependencies using pip and pyproject.toml
+    pip install -e ".[dev]" 
+    # If using uv, you might use: uv pip install -e ".[dev]"
     ```
 
 4.  **Environment Variables:**
@@ -60,12 +62,15 @@ This is a Flask web application designed for analyzing stock portfolio performan
 
 *   **Default Benchmark:** The default benchmark is SPY. This can be overridden by setting the `BENCHMARK_TICKER` environment variable.
 *   **Secret Key:** The Flask `SECRET_KEY` is loaded from the `SESSION_SECRET` environment variable. Ensure this is set to a strong, unique value, especially for production.
-*   **Database Cache:** The application attempts to connect to a PostgreSQL database for caching if `setup_cache_table()` is called and requires connection details (likely via `DATABASE_URL` environment variable, though implementation details are in `analytics.py`).
+*   **Database Cache:** The application uses Flask-SQLAlchemy for caching analysis results to a database. 
+    *   It requires the `DATABASE_URL` environment variable to be set with a valid SQLAlchemy connection string (e.g., `postgresql://user:password@host:port/database` or `sqlite:///instance/dev.db`).
+    *   The necessary table (`portfolio_cache`) is automatically created or checked on application startup via `db.create_all()`.
+    *   While tested with PostgreSQL (requires `psycopg2-binary`), it uses a generic JSON type and should work with other SQLAlchemy-supported databases like SQLite.
 
 ## TODO / Future Enhancements
 
-*   Implement comprehensive backend tests (unit, integration).
-*   Refactor database interactions (consider SQLAlchemy ORM, migrations).
-*   Enhance input validation (tickers, weights).
+*   Implement more comprehensive backend tests (unit, integration). (Current `tests/` directory exists).
+*   Further enhance input validation edge cases. (Basic validation exists).
 *   Add user accounts/authentication.
-*   Improve UI/UX further. 
+*   Improve UI/UX further.
+*   Consider adding database migration management if schema evolves significantly (Flask-Migrate is installed). 

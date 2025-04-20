@@ -112,19 +112,30 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
 
     # --- Configuration ---
-    secret = os.getenv("SESSION_SECRET")
-    if not secret:
-        raise RuntimeError(
-            "SESSION_SECRET environment variable is required. "
-            "Export it or add it to .env before starting the app."
-        )
-
+    # Default configuration (can be overridden by test_config or environment vars)
     app.config.from_mapping(
-        SECRET_KEY=secret,
         BENCHMARK_TICKER=os.getenv("BENCHMARK_TICKER", "SPY"),
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
+
+    if test_config is None:
+        # Load the instance config, if it exists, when not testing
+        app.config.from_pyfile('config.py', silent=True)
+        # Load secret key from environment variable if not testing
+        secret = os.getenv("SESSION_SECRET")
+        if not secret:
+            raise RuntimeError(
+                "SESSION_SECRET environment variable is required. "
+                "Export it or add it to .env before starting the app."
+            )
+        app.config["SECRET_KEY"] = secret
+    else:
+        # Load the test config if passed in
+        app.config.from_mapping(test_config)
+        # Ensure SECRET_KEY is set for testing if provided in test_config
+        if 'SECRET_KEY' not in app.config:
+            raise RuntimeError('SECRET_KEY must be set in test_config')
 
     # --- CSRF ---
     csrf = CSRFProtect()            #  ← NEW

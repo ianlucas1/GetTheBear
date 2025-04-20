@@ -106,6 +106,15 @@ venv/
 env/
 ENV/
 
+# Potential artifact venv dirs (if accidentally recreated)
+Python/
+own/
+"#"/
+folder/
+its/
+with/
+create/
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -157,3 +166,6 @@ tokens.json
 
 # Output folders from ad‑hoc scripts
 .token_tmp/
+
+# Development artifacts
+attached_assets/

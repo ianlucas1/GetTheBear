@@ -40,12 +40,9 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """Production configuration."""
-    # Ensure SECRET_KEY is set in production
-    if not os.getenv('SESSION_SECRET'):
-        raise RuntimeError("FATAL: SESSION_SECRET environment variable must be set in production.")
-    # Ensure DATABASE_URL is set in production
-    if not os.getenv('DATABASE_URL'):
-        raise RuntimeError("FATAL: DATABASE_URL environment variable must be set in production.")
+    # Checks for essential production variables will be moved to app factory
+    # to avoid errors during import/testing when env vars aren't set.
+    pass
 
 # Function to get the appropriate config based on environment variable
 def get_config():

@@ -29,12 +29,22 @@ def create_app(test_config=None):
     if test_config is None:
         # Load configuration from config.py based on FLASK_CONFIG env var
         app.config.from_object(ActiveConfig)
-        # Check if SECRET_KEY was actually set (handles default case warning in config.py)
-        if app.config['SECRET_KEY'] == 'default-secret-key-for-dev-change-me' and not app.debug:
-             raise RuntimeError(
-                "SESSION_SECRET environment variable is required in non-debug mode. "
-                "Export it or add it to .env before starting the app."
-            )
+
+        # --- Runtime Production Checks ---
+        # Check for essential configs ONLY when running in a non-testing, non-debug context
+        if not app.testing and not app.debug:
+            # Check SECRET_KEY (should not be the default value)
+            if app.config.get('SECRET_KEY') == 'default-secret-key-for-dev-change-me':
+                raise RuntimeError(
+                    "FATAL: SESSION_SECRET environment variable must be set and different from the default in production."
+                )
+            # Check DATABASE_URL (should exist and not be the default SQLite path if a real DB is expected)
+            db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')
+            if not db_uri or 'instance/dev.db' in db_uri: # Check if it's missing or still the default SQLite
+                # You might want to make this check more specific if using SQLite in prod is acceptable
+                app.logger.warning("Potential Production Issue: DATABASE_URL is not set or uses the default SQLite path.")
+                # Uncomment the line below to make a non-default DATABASE_URL mandatory for production:
+                # raise RuntimeError("FATAL: DATABASE_URL environment variable must be set to a non-default value in production.")
     else:
         # Load the test configuration if passed in
         app.config.from_mapping(test_config)

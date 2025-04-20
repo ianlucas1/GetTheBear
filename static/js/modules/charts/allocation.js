@@ -109,11 +109,18 @@ export async function createAllocationChart(canvasId, legendId, labels, weights)
         ul.innerHTML = ''; // clear previous
         data.labels.forEach((lbl, i) => {
           const li = document.createElement('li');
-          li.innerHTML = `
-            <span class="swatch"
-                  style="background:${data.datasets[0].backgroundColor[i]}"></span>
-            <span class="lbl">${lbl}</span>
-            <span class="val">${data.datasets[0].data[i]}%</span>`;
+          const swatch = document.createElement('span');
+          swatch.className = 'swatch';
+          swatch.style.background = data.datasets[0].backgroundColor[i];
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'lbl';
+          labelSpan.textContent = lbl;
+          const valueSpan = document.createElement('span');
+          valueSpan.className = 'val';
+          valueSpan.textContent = `${data.datasets[0].data[i]}%`;
+          li.appendChild(swatch);
+          li.appendChild(labelSpan);
+          li.appendChild(valueSpan);
           ul.appendChild(li);
         });
       }

@@ -1,73 +1,52 @@
-//  static/js/charts.js
-//  Loads all chart modules once and exposes Chart to modules
+/**
+ * charts.js
+ * 
+ * Exports the globally available Chart object and provides access
+ * to the custom Matrix controller/element if loaded.
+ */
 
-// First ensure Chart.js is loaded and globally available
-let chartReady;
-const chartReadyPromise = new Promise(resolve => {
-  chartReady = resolve;
-});
+// Export the global Chart object directly
+// Assumes Chart.js (specifically chart.auto.min.js or similar) 
+// has been loaded via a <script> tag in layout.html
+export const ChartModule = window.Chart;
 
-// Check if Chart is already loaded
-if (typeof Chart !== 'undefined') {
-  chartReady();
+/**
+ * Attempts to get the MatrixController constructor.
+ * Assumes custom-matrix.js has been loaded globally.
+ * 
+ * @returns {Function|null} The MatrixController constructor or null.
+ */
+export function getMatrixController() {
+    // Access the controller potentially attached to the global Chart object
+    // by custom-matrix.js
+    return window.Chart?.controllers?.matrix || null;
+}
+
+/**
+ * Attempts to get the MatrixElement constructor.
+ * Assumes custom-matrix.js has been loaded globally.
+ * 
+ * @returns {Function|null} The MatrixElement constructor or null.
+ */
+export function getMatrixElement() {
+    // Access the element potentially attached to the global Chart object
+    // by custom-matrix.js
+    return window.Chart?.elements?.MatrixElement || null;
+}
+
+// Optional: Perform a check and log if Chart wasn't loaded
+if (!ChartModule) {
+    console.error("Chart.js core library (window.Chart) not found. Ensure it is loaded globally in layout.html before this module.");
+}
+
+// Optional: Log if custom matrix components were found
+if (getMatrixController()) {
+    console.log("Custom MatrixController found.");
 } else {
-  // If not, wait for it to load
-  window.addEventListener('ChartLoaded', chartReady);
-  // Fallback if event never fires
-  setTimeout(chartReady, 1000);
+    console.warn("Custom MatrixController not found. Correlation chart might not work.");
 }
-
-// Track matrix plugin loading for correlation charts
-let matrixReady;
-const matrixReadyPromise = new Promise(resolve => {
-  matrixReady = resolve;
-});
-
-// Check if MatrixController is already defined in window
-if (typeof window.MatrixController !== 'undefined') {
-  matrixReady();
+if (getMatrixElement()) {
+    console.log("Custom MatrixElement found.");
 } else {
-  // If not, wait for our custom event
-  window.addEventListener('MatrixPluginLoaded', matrixReady);
-  // Fallback if event never fires - allow Matrix to be null but don't block other charts
-  setTimeout(() => {
-    console.log("Matrix plugin load timeout - will proceed anyway");
-    matrixReady();
-  }, 2000);
+     console.warn("Custom MatrixElement not found. Matrix chart rendering might be affected.");
 }
-
-// Export a function to get the Chart object safely
-export async function getChart() {
-  await chartReadyPromise;
-  return window.Chart;
-}
-
-// Export a function to get the MatrixController
-export async function getMatrixController() {
-  await matrixReadyPromise;
-  return window.MatrixController || 
-         (window.Chart && window.Chart.registry.getController('matrix')) ||
-         (window.Chart && window.Chart.controllers && window.Chart.controllers.matrix);
-}
-
-// Export Chart as a promise-based module
-export const ChartModule = chartReadyPromise.then(() => window.Chart);
-
-// Export Matrix controller as a promise-based module
-export const MatrixModule = matrixReadyPromise.then(() => {
-  return window.MatrixController || 
-         (window.Chart && window.Chart.registry.getController('matrix')) ||
-         (window.Chart && window.Chart.controllers && window.Chart.controllers.matrix);
-});
-
-// Make chart modules available globally (for non-module scripts)
-(async () => {
-  await chartReadyPromise; // Wait for Chart to be available
-  
-  // dynamic import of the bundled chart modules
-  const exports = await import('./modules/charts/index.js');
-  
-  /* make every named export visible to classic scripts such as main.js
-     (e.g. createEquityCurveChart, createDrawdownChart, …) */
-  Object.assign(window, exports);
-})();

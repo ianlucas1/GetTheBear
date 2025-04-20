@@ -1,6 +1,8 @@
 import pytest
 import pandas as pd
 from datetime import datetime
+from app import create_app # Import your app factory
+from config import TestingConfig # Import your testing config
 
 # --- Common Fixtures for Test Data ---
 
@@ -42,3 +44,23 @@ def sample_portfolio_with_nan():
     df = pd.DataFrame(data, index=dates)
     df.index.name = 'Date'
     return df 
+
+@pytest.fixture(scope='module')
+def app():
+    """Create and configure a new app instance for each test module."""
+    # Create the app with the testing configuration
+    app = create_app(test_config=TestingConfig.__dict__) # Pass config as dict
+
+    # Establish an application context before running the tests
+    with app.app_context():
+        yield app
+
+@pytest.fixture(scope='module')
+def client(app):
+    """A test client for the app."""
+    return app.test_client()
+
+@pytest.fixture(scope='module')
+def runner(app):
+    """A test runner for the app's Click commands."""
+    return app.test_cli_runner() 

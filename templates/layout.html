@@ -11,38 +11,27 @@
     <!-- Plotly (only used in a few legacy chart blocks) -->
     <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
 
-    <!-- Chart.js and extras (global "Chart" for all modules) -->
-    <script>
-        // Add event listener to detect when Chart.js is loaded
-        function notifyChartLoaded() {
-            if (typeof Chart !== 'undefined') {
-                window.dispatchEvent(new Event('ChartLoaded'));
-                console.log("Chart.js loaded and notified");
-            }
-        }
-    </script>
-    
-    <!-- Load Chart.js first -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" onload="notifyChartLoaded()"></script>
-    
+    <!-- Chart.js - Using /auto bundle for common components -->
+    <!-- Note: This bundle includes common controllers, elements, scales, and plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.auto.min.js"></script>
+
     <!-- Luxon date‑adapter for the time scale -->
     <script src="https://cdn.jsdelivr.net/npm/luxon@3"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
-    
-    <!-- Custom matrix controller implementation (no external dependency) -->
+
+    <!-- Custom matrix controller implementation -->
+    <!-- Needs to be loaded AFTER Chart.js -->
     <script src="{{ url_for('static', filename='js/custom-matrix.js') }}"></script>
-    
+
     <!-- Fuse.js (ticker search) -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
     <!-- Custom stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    
-    <!-- Chart plugins helper - ensures matrix plugin is properly registered -->
-    <script src="{{ url_for('static', filename='js/chartPlugins.js') }}"></script>
-    
-    <!-- Chart helper module to ensure Chart is available to modules -->
-    <script src="{{ url_for('static', filename='js/charts.js') }}" type="module"></script>
+
+    <!-- Remove old helpers, registration will be simplified -->
+    <!-- <script src="{{ url_for('static', filename='js/chartPlugins.js') }}"></script> -->
+    <!-- <script src="{{ url_for('static', filename='js/charts.js') }}" type="module"></script> -->
 </head>
 <body>
     <header>
@@ -69,11 +58,12 @@
     <!-- ------------------------------------------------------------------
          JAVASCRIPT
          ------------------------------------------------------------------
+         - Main logic is now type="module"
          1.  chart shim  (ES‑module – re‑exports modules under /static/js/modules)
          2.  main page logic (classic script – no imports)
          ------------------------------------------------------------------ -->
 
-    <!-- 2 ▸ Main UI / AJAX logic -->
+    <!-- Main UI / AJAX logic (as ES Module) -->
     <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
 
     <!-- Optional: tiny in‑browser console (add ?debug=true to the URL) -->

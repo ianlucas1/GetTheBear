@@ -3,6 +3,7 @@ from app import create_app # Import the factory function
 import json # Import json for request data
 import pandas as pd # Import pandas for DataFrame operations
 import io # For mocking StringIO
+from flask import current_app
 
 # --- Pytest Fixtures ---
 
@@ -46,6 +47,18 @@ def test_404_not_found(client):
     assert 'error' in json_data
     # Make assertion less brittle: check for keyword instead of exact default message
     assert "not found" in json_data['error'].lower() 
+
+def test_app_creation(app):
+    """Test if the Flask app instance is created."""
+    assert app is not None
+
+def test_testing_config(app):
+    """Test if the app is loaded with the TestingConfig."""
+    assert app.config['TESTING'] is True
+    assert not app.config['DEBUG']
+    assert app.config['WTF_CSRF_ENABLED'] is False
+    assert 'SECRET_KEY' in app.config
+    assert 'SQLALCHEMY_DATABASE_URI' in app.config
 
 # --- /analyze_portfolio Tests ---
 

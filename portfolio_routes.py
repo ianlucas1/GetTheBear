@@ -218,7 +218,7 @@ def analyze_portfolio():
             if benchmark_error:
                 current_app.logger.warning(f"Could not fetch benchmark data: {benchmark_error}")
                 # Return specific error from fetch function
-                return jsonify({"error": benchmark_error}), 400
+                return jsonify({"error": "Failed to fetch benchmark data. Please try again later."}), 400
 
         # Calculate metrics for the portfolio
         metrics = calculate_metrics(df_monthly)

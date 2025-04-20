@@ -261,8 +261,8 @@ def fetch_benchmark_data(ticker, start_date, end_date):
             df_benchmark['Drawdown'] = (df_benchmark['Portfolio Value'] / rolling_max) - 1
 
     except Exception as e:
-        error = f"Error fetching benchmark data for {ticker}: {e}"
-        logger.error(error, exc_info=True)
+        logger.error(f"Error fetching benchmark data for {ticker}: {e}", exc_info=True)
+        error = "An error occurred while fetching benchmark data."
 
     # --- Cache Write Logic ---
     if use_cache and cache_key and error is None and df_benchmark is not None:

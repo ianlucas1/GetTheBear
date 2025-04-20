@@ -38,10 +38,8 @@
     </footer>
     
     <!-- Custom Scripts -->
-    <!-- Chart.js library for charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Load main.js as an ES module to include chart modules -->
-    <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
     <!-- Conditional Eruda Debug Console -->
     <script>

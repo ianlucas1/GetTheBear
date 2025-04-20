@@ -22,3 +22,10 @@ dev = [
     "pytest>=7.4.2",
     "pytest-mock>=3.14.0",
 ]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.setuptools.packages.find]
+include = ["analytics", "*"]
+exclude = ["static", "templates", "migrations", "tests", "attached_assets"]

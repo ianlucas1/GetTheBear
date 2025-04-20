@@ -261,8 +261,8 @@ def fetch_benchmark_data(ticker, start_date, end_date):
             df_benchmark['Drawdown'] = (df_benchmark['Portfolio Value'] / rolling_max) - 1
 
     except Exception as e:
-        error = f"Error fetching benchmark data for {ticker}: {e}"
-        logger.error(error, exc_info=True)
+        logger.error(f"Error fetching benchmark data for {ticker}: {e}", exc_info=True)
+        error = "An error occurred while fetching benchmark data."
 
     # --- Cache Write Logic ---
     if use_cache and cache_key and error is None and df_benchmark is not None:
@@ -399,3 +399,94 @@ def calculate_metrics(df_monthly):
     }
 
     return metrics
+
+# --- CSV Generation ---
+def generate_returns_csv(df_portfolio, df_benchmark, benchmark_ticker):
+    """Generates a CSV string buffer containing monthly and annual returns."""
+    if df_portfolio is None or df_portfolio.empty:
+        # Cannot generate CSV without portfolio data
+        return None 
+
+    # Prepare monthly returns dataframe
+    monthly_returns = pd.DataFrame(index=df_portfolio.index)
+    monthly_returns["Portfolio_Return"] = df_portfolio["Monthly Return"]
+    monthly_returns.index.name = "Date"
+
+    # Add year and month columns
+    monthly_returns["Year"] = monthly_returns.index.year
+    monthly_returns["Month"] = monthly_returns.index.month
+
+    # Base column order
+    column_order = ["Year", "Month", "Portfolio_Return"]
+
+    # Add benchmark monthly returns if available
+    if df_benchmark is not None and not df_benchmark.empty:
+        monthly_returns["Benchmark_Return"] = (
+            df_benchmark["Monthly Return"]
+            .reindex(monthly_returns.index)
+            .fillna(0) # Fill missing benchmark returns with 0
+        )
+        column_order.append("Benchmark_Return")
+
+    # Helper function to calculate annual return from monthly data
+    def calculate_annual_return(monthly_returns_series):
+        if monthly_returns_series.empty:
+            return 0.0 # Handle empty series for a year
+        # Ensure no NaN values interfere with product calculation
+        cleaned_series = monthly_returns_series.fillna(0)
+        # Compounded return: (1 + r1) * (1 + r2) * ... * (1 + rn) - 1
+        return ((1 + cleaned_series).prod() - 1) * 100
+
+    # Calculate annual returns for portfolio and benchmark
+    annual_returns_list = []
+    # Group by Year, handle potential non-datetime index temporarily if needed
+    if pd.api.types.is_datetime64_any_dtype(monthly_returns.index):
+        grouped = monthly_returns.groupby(monthly_returns.index.year)
+    else: # Fallback if index is not datetime (shouldn't happen with current logic)
+        monthly_returns['Year'] = pd.to_datetime(monthly_returns.index).year
+        grouped = monthly_returns.groupby('Year')
+        
+    for year, group in grouped:
+        year_data = {"Year": year}
+        year_data["Portfolio_Ann_Return"] = calculate_annual_return(group["Portfolio_Return"])
+        if "Benchmark_Return" in group.columns:
+            year_data["Benchmark_Ann_Return"] = calculate_annual_return(group["Benchmark_Return"])
+        annual_returns_list.append(year_data)
+
+    annual_returns = pd.DataFrame(annual_returns_list)
+
+    # Fill NaNs *before* converting to percentage and writing to CSV
+    if "Portfolio_Return" in monthly_returns.columns:
+        monthly_returns["Portfolio_Return"] = monthly_returns["Portfolio_Return"].fillna(0)
+    if "Benchmark_Return" in monthly_returns.columns:
+        monthly_returns["Benchmark_Return"] = monthly_returns["Benchmark_Return"].fillna(0)
+
+    # Convert monthly returns to percentage for output (after annual calc)
+    monthly_returns["Portfolio_Return"] = monthly_returns["Portfolio_Return"] * 100
+    if "Benchmark_Return" in monthly_returns.columns:
+        monthly_returns["Benchmark_Return"] = monthly_returns["Benchmark_Return"] * 100
+
+    # Reorder columns
+    monthly_returns = monthly_returns[column_order]
+
+    # Reorder annual returns columns
+    annual_column_order = ["Year", "Portfolio_Ann_Return"]
+    if "Benchmark_Ann_Return" in annual_returns.columns:
+        annual_column_order.append("Benchmark_Ann_Return")
+    annual_returns = annual_returns[annual_column_order]
+
+    # Create the CSV buffer
+    csv_buffer = io.StringIO()
+    csv_buffer.write("MONTHLY RETURNS\n")
+    # Use float_format in to_csv which applies AFTER NaNs have been filled
+    monthly_returns.to_csv(csv_buffer, index=True, float_format="%.2f") 
+
+    csv_buffer.write("\n\nANNUAL RETURNS\n")
+    annual_returns.to_csv(csv_buffer, index=False, float_format="%.2f")
+
+    csv_buffer.seek(0)
+    
+    # Generate filename
+    filename = f"portfolio_vs_{benchmark_ticker}_returns.csv"
+
+    return csv_buffer, filename

@@ -145,3 +145,15 @@ cython_debug/
 
 # macOS files
 .DS_Store
+
+# ──────────────────────────────
+# Token–count helper artefacts
+# ──────────────────────────────
+# CSV or txt reports you create on demand
+tokens.csv
+token_report.*
+# Temporary JSON that some users export
+tokens.json
+
+# Output folders from ad‑hoc scripts
+.token_tmp/

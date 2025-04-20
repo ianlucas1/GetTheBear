@@ -682,21 +682,6 @@ select.form-control.btn-outline:hover {
   border-width: 0;
 }
 
-/* Remove the duplicate/overriding ticker-control-row at the end */
-/*
-.ticker-control-row {
-    display: flex !important;
-    justify-content: space-between;
-    align-items: center;
-}
-*/
-
-/* Remove the duplicate btn-primary styles at the end */
-/*
-.btn-primary{background:#0057d6;border-color:#0057d6;color:#fff;}
-.btn-primary:hover{background:#0049b6;border-color:#0049b6;}
-*/
-
 /* Add visible focus styles for keyboard navigation */
 *:focus-visible {
   outline: 3px solid var(--primary);

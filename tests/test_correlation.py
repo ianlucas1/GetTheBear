@@ -14,7 +14,7 @@ class TestCorrelationMatrix(unittest.TestCase):
         """Test that the correlation matrix has expected properties."""
         # Create the data with known correlation properties
         np.random.seed(42)
-        date_rng = pd.date_range(start='2023-01-01', end='2023-03-01', freq='BM') # Use Business Month End
+        date_rng = pd.date_range(start='2023-01-01', end='2023-03-01', freq='BME') # Use Business Month End (Changed from BM)
         n_samples = len(date_rng)
 
         # Create base random returns for AAPL
@@ -64,7 +64,6 @@ class TestCorrelationMatrix(unittest.TestCase):
         
         # MSFT and GOOG might have less predictable correlation, 
         # could test if needed or omit specific value test.
-        # self.assertLess(matrix_values[msft_idx][goog_idx], 0, "MSFT and GOOG relation check")
 
 if __name__ == '__main__':
     unittest.main()

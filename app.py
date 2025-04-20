@@ -4,12 +4,14 @@ import re # Import regex module
 from flask import Flask, render_template, request, jsonify, Response, current_app
 import pandas as pd
 import io
+import math
 from datetime import datetime
 from analytics import (
     fetch_portfolio_data,
     calculate_metrics,
     fetch_benchmark_data,
 )
+from flask_wtf import CSRFProtect   #  ← NEW
 # Import db object from models.py
 from models import db, CacheEntry
 from flask.cli import with_appcontext
@@ -110,19 +112,34 @@ def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
 
     # --- Configuration ---
+    # Default configuration (can be overridden by test_config or environment vars)
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get("SESSION_SECRET", "dev-secret-key"),
-        BENCHMARK_TICKER=os.environ.get('BENCHMARK_TICKER', 'SPY'),
-        # Configure SQLAlchemy Database URI from DATABASE_URL env var
-        SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL'),
-        # Optional: Disable modification tracking if not needed
-        SQLALCHEMY_TRACK_MODIFICATIONS=False 
+        BENCHMARK_TICKER=os.getenv("BENCHMARK_TICKER", "SPY"),
+        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
     if test_config is None:
+        # Load the instance config, if it exists, when not testing
         app.config.from_pyfile('config.py', silent=True)
+        # Load secret key from environment variable if not testing
+        secret = os.getenv("SESSION_SECRET")
+        if not secret:
+            raise RuntimeError(
+                "SESSION_SECRET environment variable is required. "
+                "Export it or add it to .env before starting the app."
+            )
+        app.config["SECRET_KEY"] = secret
     else:
+        # Load the test config if passed in
         app.config.from_mapping(test_config)
+        # Ensure SECRET_KEY is set for testing if provided in test_config
+        if 'SECRET_KEY' not in app.config:
+            raise RuntimeError('SECRET_KEY must be set in test_config')
+
+    # --- CSRF ---
+    csrf = CSRFProtect()            #  ← NEW
+    csrf.init_app(app)              #  ← NEW
 
     # --- Logging ---
     # Use Flask's built-in logger
@@ -280,7 +297,29 @@ def create_app(test_config=None):
                 if benchmark_metrics and "annual_returns" in benchmark_metrics:
                     chart_data["benchmark_annual_returns"] = benchmark_metrics["annual_returns"]
 
-            return jsonify(
+            # -------- scrub NaN / Inf so JSON is valid --------
+            def _clean(o):
+                if isinstance(o, float) and (math.isnan(o) or math.isinf(o)):
+                    return "0.00%"  # Replace NaN/Inf with a default formatted value
+                if isinstance(o, str) and o.endswith("%"):
+                    try:
+                        # If it's a percentage string, try to parse and check for NaN
+                        value = float(o.replace("%", ""))
+                        if math.isnan(value) or math.isinf(value):
+                            return "0.00%"
+                    except ValueError:
+                        # If it can't be parsed, return the original
+                        pass
+                # For lists, recursively clean each item
+                if isinstance(o, list):
+                    return [_clean(v) for v in o]
+                # For dicts, recursively clean each value
+                if isinstance(o, dict):
+                    return {k: _clean(v) for k, v in o.items()}
+                # Return the original value unmodified
+                return o
+
+            cleaned = _clean(
                 {
                     "metrics": metrics,
                     "benchmark_metrics": benchmark_metrics,
@@ -289,12 +328,12 @@ def create_app(test_config=None):
                     "success": True,
                 }
             )
+            return jsonify(cleaned)
 
         except Exception as e:
             current_app.logger.exception("Error analyzing portfolio") # Log full error
             # Return generic message to user
             return jsonify({"error": "An unexpected error occurred during portfolio analysis."}), 500
-
 
     @app.route("/download_returns", methods=["GET"])
     def download_returns():

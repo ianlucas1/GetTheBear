@@ -1,84 +1,166 @@
 /**
- * Charts module index
- * Aggregates and exports all chart-related functions
+ * Charts‑module index
+ *  ‑ imports individual chart helpers
+ *  ‑ re‑exports them for ES‑modules
+ *  ‑ exposes them on window for classic scripts (main.js)
  */
 
-import { createEquityCurveChart } from './equityCurve.js';
-import { createDrawdownChart } from './drawdown.js';
+import { createEquityCurveChart }   from './equityCurve.js';
+import { createDrawdownChart }      from './drawdown.js';
 import { createAnnualReturnsChart } from './annualReturns.js';
-import { createAllocationChart } from './allocation.js';
-import { createCorrelationChart } from './correlation.js';
+import { createAllocationChart }    from './allocation.js';
+import { createCorrelationChart }   from './correlation.js';
+import { ChartModule, getMatrixController } from '../../charts.js';
+
+let chartComponentsRegistered = false;
 
 /**
- * Initialize all tab functionality
+ * Ensures necessary Chart.js components are registered once.
+ * Should be called by chart creation functions before using Chart.
  */
+async function ensureChartComponentsRegistered() {
+    if (chartComponentsRegistered) return true;
+
+    try {
+        // Wait for Chart to be available via our module system
+        const Chart = await ChartModule;
+        
+        if (!Chart) {
+            console.error("Chart.js global object not found even after waiting.");
+            return false;
+        }
+
+        // Get components from Chart
+        const {
+            // Common components
+            LineController, LineElement, PointElement,
+            BarController, BarElement,
+            CategoryScale, LinearScale, TimeScale,
+            Tooltip, Legend, Title, Filler,
+            // Elements for pie/doughnut charts
+            ArcElement, DoughnutController
+        } = Chart;
+
+        if (!Chart.register) {
+            console.error("Chart.register function not found.");
+            return false;
+        }
+
+        // Base components needed by most charts
+        const baseComponents = [
+            LineController, LineElement, PointElement,
+            BarController, BarElement,
+            CategoryScale, LinearScale, TimeScale,
+            Tooltip, Legend, Title, Filler
+        ].filter(Boolean); // Filter out undefined if any controller failed to load
+
+        if (baseComponents.length > 0) {
+            Chart.register(...baseComponents);
+            console.log("Base chart components registered successfully");
+        }
+
+        // Register doughnut components if available
+        if (ArcElement && DoughnutController) {
+            Chart.register(ArcElement, DoughnutController);
+            console.log("Doughnut components registered");
+        }
+
+        // Try to get MatrixController but don't block other charts if it fails
+        try {
+            const MatrixController = await getMatrixController();
+            if (MatrixController) {
+                // MatrixElement might be available on window.Chart
+                const MatrixElement = window.Chart && window.Chart.MatrixElement;
+                
+                if (!Chart.registry.getController('matrix')) {
+                    if (MatrixElement) {
+                        Chart.register(MatrixController, MatrixElement);
+                        console.log("Matrix components registered in index.js");
+                    } else {
+                        Chart.register(MatrixController);
+                        console.log("Matrix controller registered in index.js (element not found)");
+                    }
+                }
+            } else {
+                console.warn("Matrix components not available during registration in index.js");
+            }
+        } catch (matrixError) {
+            console.warn("Matrix registration error in index.js:", matrixError);
+            // Continue without matrix - it's handled separately in correlation.js
+        }
+
+        chartComponentsRegistered = true;
+        console.log("Chart.js components registered successfully.");
+        return true;
+
+    } catch (error) {
+        console.error("Error during Chart.js component registration:", error);
+        chartComponentsRegistered = false; // Mark as failed
+        return false;
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ *  Tab handling
+ * ------------------------------------------------------------------ */
 export function setupTabs() {
-    // Tab switching
     const tablist = document.querySelector('.tabs[role="tablist"]');
     if (!tablist) return;
-    
-    const tabs = tablist.querySelectorAll('.tab[role="tab"]');
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            // Find the previously selected tab and set aria-selected to false
-            const previousSelectedTab = tablist.querySelector('.tab[aria-selected="true"]');
-            if (previousSelectedTab) {
-                previousSelectedTab.classList.remove('active');
-                previousSelectedTab.setAttribute('aria-selected', 'false');
+    tablist.querySelectorAll('.tab[role="tab"]').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const prev = tablist.querySelector('.tab[aria-selected="true"]');
+            if (prev) {
+                prev.classList.remove('active');
+                prev.setAttribute('aria-selected', 'false');
             }
-            
-            // Set aria-selected to true on the clicked tab
-            this.classList.add('active');
-            this.setAttribute('aria-selected', 'true');
-            
-            // Show corresponding content
-            const tabId = this.getAttribute('data-tab');
-            document.querySelectorAll('.tab-content[role="tabpanel"]').forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            const tabPanel = document.getElementById(tabId);
-            if (tabPanel) {
-                tabPanel.classList.add('active');
-            }
+            tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+
+            const id = tab.dataset.tab;
+            document.querySelectorAll('.tab-content[role="tabpanel"]')
+                    .forEach(p => p.classList.toggle('active', p.id === id));
         });
     });
 }
 
-/**
- * Create all charts from analysis data
- * @param {Object} data - The portfolio analysis data from the API
- * @param {Array} originalTickers - The tickers from the form
- * @param {Array} originalWeights - The weights from the form
- */
-export function createCharts(data, originalTickers, originalWeights) {
-    // Normalize weights to sum to 1 for pie chart
-    let normalizedWeights = [];
-    if (originalWeights && originalWeights.length > 0) {
-        const totalWeight = originalWeights.reduce((a, b) => a + b, 0);
-        normalizedWeights = originalWeights.map(w => w / totalWeight);
+/* ------------------------------------------------------------------ *
+ *  Chart creation orchestrator
+ * ------------------------------------------------------------------ */
+export async function createCharts(data, origTickers, origWeights) {
+    /* ensure Chart is ready */
+    await ensureChartComponentsRegistered();
+    
+    /* normalise weights for pie‑chart */
+    const total = (origWeights ?? []).reduce((a, b) => a + b, 0);
+    const norm  = total ? origWeights.map(w => w / total) : [];
+
+    // Create all charts in parallel
+    const chartPromises = [
+        createEquityCurveChart('equity-chart', data.chart_data),
+        createDrawdownChart('drawdown-chart', data.chart_data),
+        createAnnualReturnsChart('returns-chart', data.chart_data),
+        createAllocationChart('allocation-chart', 'allocation-legend', origTickers, norm)
+    ];
+    
+    // Add correlation chart if data exists
+    if (data.correlation_matrix?.tickers?.length > 1) {
+        chartPromises.push(createCorrelationChart('correlation-chart', data.correlation_matrix));
     }
     
-    // Create each chart
-    createEquityCurveChart('equity-chart', data.chart_data);
-    createDrawdownChart('drawdown-chart', data.chart_data);
-    createAnnualReturnsChart('returns-chart', data.chart_data);
-    
-    // Create allocation pie chart
-    createAllocationChart('allocation-chart', 'allocation-legend', originalTickers, normalizedWeights);
-    
-    // Create correlation heatmap if data is available
-    if (data.correlation_matrix && data.correlation_matrix.tickers && data.correlation_matrix.tickers.length > 1) {
-        createCorrelationChart('correlation-chart', data.correlation_matrix);
-    }
+    // Wait for all charts to render
+    await Promise.allSettled(chartPromises);
+    console.log("All charts created");
 }
 
-// Export all chart-related functions
+/* ------------------------------------------------------------------ *
+ *  ES‑module re‑exports
+ * ------------------------------------------------------------------ */
 export {
+    ensureChartComponentsRegistered,
     createEquityCurveChart,
     createDrawdownChart,
     createAnnualReturnsChart,
     createAllocationChart,
     createCorrelationChart
-}; 
+};

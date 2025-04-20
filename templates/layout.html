@@ -3,59 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Get the Bear | Portfolio Analysis Tool</title>
-    
-    <!-- Fonts -->
+    <title>Get&nbsp;the&nbsp;Bear | Portfolio Analysis Tool</title>
+
+    <!-- Google fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Plotly.js for charts -->
+
+    <!-- Plotly (only used in a few legacy chart blocks) -->
     <script src="https://cdn.plot.ly/plotly-2.12.1.min.js"></script>
+
+    <!-- Chart.js and extras (global "Chart" for all modules) -->
+    <script>
+        // Add event listener to detect when Chart.js is loaded
+        function notifyChartLoaded() {
+            if (typeof Chart !== 'undefined') {
+                window.dispatchEvent(new Event('ChartLoaded'));
+                console.log("Chart.js loaded and notified");
+            }
+        }
+    </script>
     
-    <!-- Fuse.js for fuzzy search -->
+    <!-- Load Chart.js first -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" onload="notifyChartLoaded()"></script>
+    
+    <!-- Luxon date‑adapter for the time scale -->
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1"></script>
+    
+    <!-- Custom matrix controller implementation (no external dependency) -->
+    <script src="{{ url_for('static', filename='js/custom-matrix.js') }}"></script>
+    
+    <!-- Fuse.js (ticker search) -->
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
-    
-    <!-- Custom CSS -->
+
+    <!-- Custom stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    
+    <!-- Chart plugins helper - ensures matrix plugin is properly registered -->
+    <script src="{{ url_for('static', filename='js/chartPlugins.js') }}"></script>
+    
+    <!-- Chart helper module to ensure Chart is available to modules -->
+    <script src="{{ url_for('static', filename='js/charts.js') }}" type="module"></script>
 </head>
 <body>
     <header>
         <div class="container header-content">
             <div class="logo">Get the Bear</div>
-            <div class="app-description">Portfolio analysis tool for visualizing investment performance across multiple securities</div>
+            <div class="app-description">
+                Portfolio analysis tool for visualising investment performance across multiple securities
+            </div>
         </div>
     </header>
-    
+
     <main>
         <div class="container">
             {% block content %}{% endblock %}
         </div>
     </main>
-    
+
     <footer>
         <div class="container footer-content">
-            <p>Get the Bear - Investment Portfolio Analysis Tool &copy; 2023</p>
+            <p>Get the Bear – Investment Portfolio Analysis Tool © 2023</p>
         </div>
     </footer>
-    
-    <!-- Custom Scripts -->
-    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
-    <!-- Conditional Eruda Debug Console -->
-    <script>
-        // Only load Eruda when debug=true is in the URL
-        (function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const debugMode = urlParams.get('debug') === 'true';
-            
-            if (debugMode) {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/eruda';
-                document.body.appendChild(script);
-                script.onload = function() {
-                    eruda.init();
-                    console.log('Debug mode enabled');
-                };
+
+    <!-- ------------------------------------------------------------------
+         JAVASCRIPT
+         ------------------------------------------------------------------
+         1.  chart shim  (ES‑module – re‑exports modules under /static/js/modules)
+         2.  main page logic (classic script – no imports)
+         ------------------------------------------------------------------ -->
+
+    <!-- 2 ▸ Main UI / AJAX logic -->
+    <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
+
+    <!-- Optional: tiny in‑browser console (add ?debug=true to the URL) -->
+    <script defer>
+        (() => {
+            if (new URLSearchParams(location.search).get('debug') === 'true') {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+                s.onload = () => eruda.init();
+                document.body.appendChild(s);
             }
         })();
     </script>

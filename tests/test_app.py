@@ -17,7 +17,8 @@ def app():
         'SECRET_KEY': 'test-secret-key',
         # Use in-memory SQLite for tests that don't need the real DB
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:', 
-        'SQLALCHEMY_TRACK_MODIFICATIONS': False # Silence FSADeprecationWarning
+        'SQLALCHEMY_TRACK_MODIFICATIONS': False, # Silence FSADeprecationWarning
+        'WTF_CSRF_ENABLED': False # Disable CSRF for testing
     })
     yield app
 
@@ -173,16 +174,17 @@ def test_analyze_portfolio_invalid_ticker_format(client):
     assert "Invalid ticker format" in json_data['error']
 
 # --- Placeholder for Future Tests ---
-# def test_analyze_portfolio_valid(client):
-#     # Test the /analyze_portfolio endpoint with valid data
-#     # Requires mocking analytics functions or providing test data
-#     pass
-
-# def test_analyze_portfolio_invalid_input(client):
-#     # Test the /analyze_portfolio endpoint with invalid data (e.g., bad weights)
-#     pass
-
-# def test_download_returns(client):
-#     # Test the /download_returns endpoint
-#     # Requires mocking analytics functions or providing test data
-#     pass 
+# REMOVE
+# def test_analyze_portfolio_valid(client): # REMOVE
+#     # Test the /analyze_portfolio endpoint with valid data # REMOVE
+#     # Requires mocking analytics functions or providing test data # REMOVE
+#     pass # REMOVE
+# REMOVE
+# def test_analyze_portfolio_invalid_input(client): # REMOVE
+#     # Test the /analyze_portfolio endpoint with invalid data (e.g., bad weights) # REMOVE
+#     pass # REMOVE
+# REMOVE
+# def test_download_returns(client): # REMOVE
+#     # Test the /download_returns endpoint # REMOVE
+#     # Requires mocking analytics functions or providing test data # REMOVE
+#     pass # REMOVE

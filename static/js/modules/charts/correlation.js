@@ -1,194 +1,187 @@
-/**
- * Correlation Chart Module
- */
+/*  static/js/modules/charts/correlation.js
+    Correlation‑matrix heat‑map (Chart.js v4 + chartjs‑chart‑matrix)  */
 
+// Import the registration helper and Chart module
+import { ensureChartComponentsRegistered } from './index.js';
+import { ChartModule, MatrixModule, getMatrixController } from '../../charts.js';
+
+/* ------------------------------------------------------------------
+   1 ▸ grab Chart & matrix pieces from the global namespace, register
+   ------------------------------------------------------------------ */
 /**
- * Create a correlation heatmap chart
- * @param {string} containerId - The ID of the HTML element to render the chart in
- * @param {Object} correlationData - Correlation data from the API response
+ * Render a correlation heat‑map.
+ *
+ * @param {string}  containerId  <div id="…"> that will host a <canvas>
+ * @param {{ tickers:string[], matrix:number[][] }} correlationData
  */
-export function createCorrelationChart(containerId, correlationData) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    
-    // Validate input data
-    if (!correlationData || !correlationData.tickers || !correlationData.matrix || 
-        correlationData.tickers.length === 0 || correlationData.matrix.length === 0) {
-        container.innerHTML = '<div class="chart-error">Insufficient data to create correlation chart</div>';
-        return;
+export async function createCorrelationChart(containerId, correlationData) {
+  // Ensure Chart.js is ready and components are registered
+  const success = await ensureChartComponentsRegistered();
+  if (!success) {
+    console.error("Failed to register Chart.js components");
+    const errContainer = document.getElementById(containerId);
+    if (errContainer) {
+      errContainer.innerHTML = '<div class="chart-error">Chart library not properly initialized.</div>';
     }
-    
-    const tickers = correlationData.tickers;
-    const matrix = correlationData.matrix;
-    
-    // Ensure we have valid matrix dimensions
-    if (matrix.length !== tickers.length) {
-        container.innerHTML = '<div class="chart-error">Invalid correlation data dimensions</div>';
-        return;
+    return;
+  }
+
+  // Get Chart object
+  const Chart = await ChartModule;
+  
+  // Check if MatrixController is already registered
+  if (!Chart.registry.getController('matrix')) {
+    console.error("Matrix controller not registered yet");
+    const errContainer = document.getElementById(containerId);
+    if (errContainer) {
+      errContainer.innerHTML = '<div class="chart-error">Matrix chart controller not available.</div>';
     }
+    return;
+  }
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  /* ── sanity checks ─────────────────────────────────────────────── */
+  if (
+    !correlationData?.tickers?.length ||
+    !correlationData?.matrix?.length  ||
+    correlationData.tickers.length !== correlationData.matrix.length
+  ) {
+    container.innerHTML =
+      '<div class="chart-error">Insufficient correlation data</div>';
+    return;
+  }
+
+  const tickers = correlationData.tickers;
+  const matrix  = correlationData.matrix;
+  const size    = tickers.length;
+
+  /* ── flatten matrix to {x,y,v} list (matrix controller format) ── */
+  const points = [];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      points.push({ 
+        x: x,               // Use integer index instead of ticker name
+        y: y,               // Use integer index instead of ticker name
+        v: matrix[y][x],    // The correlation value
+        xLabel: tickers[x], // Keep ticker name as label
+        yLabel: tickers[y]  // Keep ticker name as label
+      });
+    }
+  }
+
+  /* colour helper (blue ↔ white ↔ red) ──────────────────────────── */
+  const cellColor = (context) => {
+    // Get value from context
+    const value = context.raw ? context.raw.v : context.v;
     
-    // Format data for the heatmap
-    const datasets = [];
-    
-    // Create dataset for each row
-    for (let i = 0; i < tickers.length; i++) {
-        const rowData = [];
+    return value < 0
+      ? `rgba(  0,  0,255,${Math.abs(value) * 0.7})`
+      : `rgba(255,  0,  0,${value * 0.7})`;
+  };
+
+  /* ── matrix value labels plug‑in ───────────────────────────────── */
+  const correlationLabelsPlugin = {
+    id: 'correlationLabels',
+    afterDatasetDraw(chart) {
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Get data and scales
+      const dataset = chart.data.datasets[0];
+      const data = dataset.data || [];
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      
+      if (!xScale || !yScale) return;
+      
+      // Draw text for each data point
+      data.forEach(point => {
+        const x = xScale.getPixelForValue(point.x);
+        const y = yScale.getPixelForValue(point.y);
+        const value = point.v;
         
-        // Create data points for each cell
-        for (let j = 0; j < tickers.length; j++) {
-            rowData.push({
-                x: j,
-                y: i,
-                v: matrix[i][j] // Original correlation value for tooltip
-            });
+        ctx.fillStyle = Math.abs(value) >= 0.7 ? '#fff' : '#000';
+        ctx.fillText(value.toFixed(2), x, y);
+      });
+      
+      ctx.restore();
+    }
+  };
+
+  /* ── build chart config ───────────────────────────────────────── */
+  const cfg = {
+    type : 'matrix',
+    data : {
+      datasets: [
+        {
+          label           : 'Correlation',
+          data            : points,
+          backgroundColor : cellColor,
+          borderColor     : 'rgba(0,0,0,0.05)',
+          borderWidth     : 1,
+          width  : ({ chart }) =>
+            (chart.chartArea?.width  ?? 0) / size - 1,
+          height : ({ chart }) =>
+            (chart.chartArea?.height ?? 0) / size - 1
         }
-        
-        datasets.push({
-            data: rowData,
-            backgroundColor: generateCellColors(matrix[i]),
-            borderColor: 'rgba(0, 0, 0, 0.1)',
-            borderWidth: 1
-        });
-    }
-    
-    // Create chart data
-    const chartConfig = {
-        type: 'matrix',
-        data: {
-            datasets: datasets
+      ]
+    },
+    options : {
+      responsive          : true,
+      maintainAspectRatio : false,
+      plugins : {
+        title : {
+          display : true,
+          text    : 'Correlation matrix',
+          font    : { size: 16 }
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Correlation Matrix',
-                    font: {
-                        size: 16
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            const item = context[0];
-                            const i = item.parsed.y;
-                            const j = item.parsed.x;
-                            return `${tickers[i]} vs ${tickers[j]}`;
-                        },
-                        label: function(context) {
-                            // Use the original value from our v property
-                            const value = context.raw.v;
-                            return `Correlation: ${value.toFixed(2)}`;
-                        }
-                    }
-                },
-                legend: {
-                    display: false
-                }
+        tooltip : {
+          callbacks : {
+            title : (ctx) => {
+              const item = ctx[0].raw;
+              return `${item.yLabel} vs ${item.xLabel}`;
             },
-            layout: {
-                padding: {
-                    top: 30,
-                    right: 30,
-                    bottom: 30,
-                    left: 30
-                }
-            },
-            scales: {
-                x: {
-                    type: 'category',
-                    labels: tickers,
-                    offset: true,
-                    ticks: {
-                        display: true
-                    },
-                    grid: {
-                        display: false
-                    }
-                },
-                y: {
-                    type: 'category',
-                    labels: tickers,
-                    offset: true,
-                    ticks: {
-                        display: true
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
+            label : (ctx) => `Correlation: ${ctx.raw.v.toFixed(2)}`
+          }
+        },
+        legend : { display: false }
+      },
+      scales : {
+        x : {
+          type   : 'category',
+          labels : tickers,
+          offset : true,
+          grid   : { display: false }
+        },
+        y : {
+          type   : 'category',
+          labels : tickers,
+          offset : true,
+          grid   : { display: false }
         }
-    };
-    
-    // Create custom plugin to draw correlation values in cells
-    const correlationLabelsPlugin = {
-        id: 'correlationLabels',
-        afterDatasetDraw: function(chart) {
-            const ctx = chart.ctx;
-            ctx.save();
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            for (let i = 0; i < tickers.length; i++) {
-                for (let j = 0; j < tickers.length; j++) {
-                    const value = matrix[i][j];
-                    const meta = chart.getDatasetMeta(i);
-                    const element = meta.data[j];
-                    
-                    // Skip if element is not visible
-                    if (!element || !element.active) continue;
-                    
-                    // Get the cell position from the element
-                    const position = element.getCenterPoint();
-                    
-                    // Set text color based on background
-                    if (value >= 0.7) {
-                        ctx.fillStyle = '#ffffff'; // White text on dark background
-                    } else {
-                        ctx.fillStyle = '#000000'; // Black text on light background
-                    }
-                    
-                    // Draw the correlation value
-                    ctx.fillText(value.toFixed(2), position.x, position.y);
-                }
-            }
-            
-            ctx.restore();
-        }
-    };
-    
-    // Register the plugin
-    Chart.register(correlationLabelsPlugin);
-    
-    // Clear previous chart if it exists
-    container.innerHTML = '';
-    
-    // Create canvas element
-    const canvas = document.createElement('canvas');
-    container.appendChild(canvas);
-    
-    // Create the chart
-    new Chart(canvas, chartConfig);
-}
+      }
+    },
+    plugins : [correlationLabelsPlugin]
+  };
 
-/**
- * Generate cell background colors based on correlation values
- * @param {Array} correlations - Array of correlation values
- * @returns {Array} Array of color strings
- */
-function generateCellColors(correlations) {
-    return correlations.map(value => {
-        // Negative correlation: Blue to White
-        if (value < 0) {
-            const intensity = Math.abs(value);
-            return `rgba(0, 0, 255, ${intensity * 0.7})`;
-        }
-        // Positive correlation: White to Red
-        else {
-            return `rgba(255, 0, 0, ${value * 0.7})`;
-        }
-    });
-} 
+  /* ── clear & render ───────────────────────────────────────────── */
+  container.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+  try {
+    /* eslint-disable-next-line no-new */
+    new Chart(canvas, cfg);
+  } catch (error) {
+    console.error("Error creating Correlation Chart instance:", error);
+    const errContainer = document.getElementById(containerId);
+    if (errContainer) { // Ensure container exists before setting innerHTML
+        errContainer.innerHTML = '<div class="chart-error">Failed to render correlation chart.</div>';
+    }
+  }
+}
+  

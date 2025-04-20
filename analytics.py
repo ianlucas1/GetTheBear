@@ -86,6 +86,7 @@ def fetch_portfolio_data(tickers, weights, start_date, end_date):
             if not clean_ticker:
                 error_tickers.append(ticker)
                 continue
+                
             # Download data using yfinance
             stock_data = yf.download(clean_ticker, start=start_date, end=end_date, progress=False)
             if stock_data.empty:
@@ -223,30 +224,29 @@ def fetch_benchmark_data(ticker, start_date, end_date):
             df_benchmark.rename(columns={'Close': 'Portfolio Value'}, inplace=True)
             
             # Calculate monthly returns and fill NaNs immediately
-            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change().fillna(0) # Fill first NaN
+            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change(fill_method=None).fillna(0)
             
-            # Calculate cumulative returns starting from 1
-            cumulative_returns = (1 + df_benchmark['Monthly Return']).cumprod()
-            
-            # Add initial row with value 1.0 before the first data point
-            start_date_dt = pd.to_datetime(start_date) # Ensure start_date is datetime
-            # Get the month start before the first data point's month end
-            initial_index_date = df_benchmark.index.min() - pd.offsets.MonthBegin(1) 
-            # Ensure this date is not before the requested start_date boundary if necessary
-            # initial_index_date = max(initial_index_date, start_date_dt - pd.Timedelta(days=1)) # Optional refinement
-            
-            initial_row = pd.DataFrame({'Portfolio Value': 1.0, 'Monthly Return': 0.0}, 
-                                     index=[initial_index_date])
-            
-            # Assign cumulative returns to 'Portfolio Value', handling potential column type issues
-            df_benchmark['Portfolio Value'] = cumulative_returns.astype(float) 
-            
-            # Concatenate initial row and re-fill potential NaNs introduced at the start if any
-            df_benchmark = pd.concat([initial_row, df_benchmark])
-            df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill() 
-            # Recalculate monthly return after potential ffill and concat ensures correctness
-            df_benchmark['Monthly Return'] = df_benchmark['Portfolio Value'].pct_change().fillna(0) 
+            # Add initial row for correct value calculation start
+            # Note: Calculation relies on the *original* first valid monthly return if available
+            # Let's calculate the initial value *before* adding the initial row and potentially overwriting the first return
+            first_valid_return_idx = df_benchmark['Monthly Return'].ne(0).idxmax() if not df_benchmark['Monthly Return'].eq(0).all() else None
+            initial_portfolio_value = 1.0 # Default initial value
+            if first_valid_return_idx is not None and first_valid_return_idx > df_benchmark.index[0]:
+                first_value = df_benchmark.loc[first_valid_return_idx, 'Portfolio Value']
+                first_return_scalar = df_benchmark.loc[first_valid_return_idx, 'Monthly Return'] # Should be scalar
+                # Ensure it's treated as scalar and compare
+                if isinstance(first_return_scalar, pd.Series):
+                    first_return_scalar = first_return_scalar.item() # Extract scalar if it's a Series
+                    
+                if first_return_scalar != -1: # Avoid division by zero if return is -100%
+                     initial_portfolio_value = first_value / (1 + first_return_scalar)
 
+            initial_row = pd.DataFrame({'Portfolio Value': initial_portfolio_value, 'Monthly Return': 0.0}, 
+                                     index=[df_benchmark.index.min() - pd.Timedelta(days=1)])
+            df_benchmark = pd.concat([initial_row, df_benchmark])
+            df_benchmark['Portfolio Value'] = df_benchmark['Portfolio Value'].ffill() # Fill potential gaps
+            # Monthly return is already calculated and filled
+            # df_benchmark['Monthly Return'] = df_benchmark['Monthly Return'].fillna(0) # Already done
 
             # Calculate Drawdown
             rolling_max = df_benchmark['Portfolio Value'].cummax()
@@ -299,7 +299,7 @@ def calculate_metrics(df_monthly):
 
     # Ensure we have enough data points
     if years <= 0 or len(df_monthly) <= 1:
-        years = 0 # Avoid division by zero if not enough data
+        years = 0 # Avoid division by zero
 
     # Total Return
     total_return = (df_monthly['Portfolio Value'].iloc[-1] / df_monthly['Portfolio Value'].iloc[0]) - 1
@@ -341,7 +341,7 @@ def calculate_metrics(df_monthly):
         if row['Drawdown'] < 0:
             if not in_drawdown:
                 in_drawdown = True
-            current_duration = 0
+                current_duration = 0
             # Increment duration (approx monthly)
             current_duration += 1 
         else:
@@ -350,7 +350,7 @@ def calculate_metrics(df_monthly):
                 max_drawdown_duration = max(max_drawdown_duration, current_duration)
     # Check if still in drawdown at the end
     if in_drawdown:
-        max_drawdown_duration = max(max_drawdown_duration, current_duration)
+         max_drawdown_duration = max(max_drawdown_duration, current_duration)
     # Convert approx months to more descriptive string (e.g., "X months")
     max_drawdown_duration_str = f"{max_drawdown_duration} months" if max_drawdown_duration > 0 else "0 months"
 

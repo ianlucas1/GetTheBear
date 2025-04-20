@@ -3,17 +3,12 @@
  * Main JavaScript File
  */
 
-// Import chart functions and tab setup from modules
-import { createEquityCurveChart, createDrawdownChart, createAnnualReturnsChart, createAllocationChart, createCorrelationChart, setupTabs } from './modules/charts/index.js';
-
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize application
     initializeDatePicker();
     setupTickerControls();
     setupBenchmarkControl();
     setupAnalysisForm();
-    // Initialize tabs for chart navigation
-    setupTabs();
 });
 
 /**

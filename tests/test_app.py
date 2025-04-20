@@ -2,6 +2,7 @@ import pytest
 from app import create_app # Import the factory function
 import json # Import json for request data
 import pandas as pd # Import pandas for DataFrame operations
+import io # For mocking StringIO
 
 # --- Pytest Fixtures ---
 
@@ -43,7 +44,8 @@ def test_404_not_found(client):
     assert response.content_type == 'application/json'
     json_data = response.get_json()
     assert 'error' in json_data
-    assert "Not Found" in json_data['error']
+    # Make assertion less brittle: check for keyword instead of exact default message
+    assert "not found" in json_data['error'].lower() 
 
 # --- /analyze_portfolio Tests ---
 
@@ -63,10 +65,10 @@ def test_analyze_portfolio_success(client, mocker):
         "cagr": "10.00%", "sharpe_ratio": "1.00", "annual_returns": {2020: "10.00%"}
     }
 
-    # Patch functions to return minimal valid data
-    mocker.patch('app.fetch_portfolio_data', return_value=(mock_df, None, mock_correlation))
-    mocker.patch('app.calculate_metrics', return_value=mock_metrics)
-    mocker.patch('app.fetch_benchmark_data', return_value=(mock_df.copy(), None)) # Use a copy for benchmark
+    # Patch functions where they are looked up (in portfolio_routes)
+    mocker.patch('portfolio_routes.fetch_portfolio_data', return_value=(mock_df, None, mock_correlation))
+    mocker.patch('portfolio_routes.calculate_metrics', return_value=mock_metrics)
+    mocker.patch('portfolio_routes.fetch_benchmark_data', return_value=(mock_df.copy(), None)) # Use a copy for benchmark
 
     valid_data = {
         "tickers": ["AAPL", "MSFT"],
@@ -172,6 +174,154 @@ def test_analyze_portfolio_invalid_ticker_format(client):
     json_data = response.get_json()
     assert 'error' in json_data
     assert "Invalid ticker format" in json_data['error']
+
+# --- /download_returns Tests ---
+
+@pytest.fixture
+def mock_csv_data():
+    """Provides mock CSV data for testing downloads."""
+    buffer = io.StringIO()
+    buffer.write("MONTHLY RETURNS\n")
+    buffer.write("Date,Year,Month,Portfolio_Return,Benchmark_Return\n")
+    buffer.write("2023-01-31,2023,1,0.00,0.00\n")
+    buffer.seek(0)
+    return buffer
+
+def test_download_returns_success(client, mocker, sample_portfolio_data, sample_benchmark_data, mock_csv_data):
+    """Test successful CSV download with valid parameters."""
+    # Mock the functions called by the route
+    mocker.patch('portfolio_routes.validate_portfolio_input', return_value=(
+        {
+            "tickers": ["AAPL", "GOOG"],
+            "weights": [50, 50],
+            "weights_normalized": [0.5, 0.5],
+            "start_date": "2023-01-01",
+            "end_date": "2023-01-31",
+            "benchmark_ticker": "SPY"
+        }, 
+        None # No error message
+    ))
+    mocker.patch('portfolio_routes.fetch_portfolio_data', return_value=(sample_portfolio_data, None, None))
+    mocker.patch('portfolio_routes.fetch_benchmark_data', return_value=(sample_benchmark_data, None))
+    mocker.patch('portfolio_routes.generate_returns_csv', return_value=(mock_csv_data, "portfolio_vs_SPY_returns.csv"))
+
+    # Construct query parameters
+    query_params = {
+        "tickers": "AAPL,GOOG",
+        "weights": "50,50",
+        "start_date": "2023-01-01",
+        "end_date": "2023-01-31",
+        "benchmark_ticker": "SPY"
+    }
+    
+    response = client.get('/download_returns', query_string=query_params)
+
+    assert response.status_code == 200
+    assert response.mimetype == 'text/csv'
+    assert 'attachment; filename=portfolio_vs_SPY_returns.csv' in response.headers['Content-Disposition']
+    # Check if the response data matches the mock CSV data
+    assert response.data.decode('utf-8') == mock_csv_data.getvalue()
+
+def test_download_returns_validation_error(client, mocker):
+    """Test download returns fails with invalid query parameters."""
+    # Mock validation to return an error
+    mocker.patch('portfolio_routes.validate_portfolio_input', 
+                 return_value=(None, "Invalid date format. Please use YYYY-MM-DD"))
+
+    # Parameters don't strictly matter here as validation is mocked to fail
+    query_params = {
+        "tickers": "AAPL", "weights": "100", "start_date": "bad-date", "end_date": "2023-01-01"
+    }
+    response = client.get('/download_returns', query_string=query_params)
+
+    assert response.status_code == 400
+    assert response.content_type == 'application/json'
+    json_data = response.get_json()
+    assert 'error' in json_data
+    assert "Invalid date format" in json_data['error']
+
+def test_download_returns_portfolio_fetch_error(client, mocker):
+    """Test download returns handles portfolio data fetch errors."""
+    # Mock validation to succeed
+    mocker.patch('portfolio_routes.validate_portfolio_input', return_value=(
+        {
+            "tickers": ["FAIL"],
+            "weights": [100],
+            "weights_normalized": [1.0],
+            "start_date": "2023-01-01",
+            "end_date": "2023-01-31",
+            "benchmark_ticker": "SPY"
+        }, 
+        None
+    ))
+    # Mock portfolio fetch to return an error
+    mocker.patch('portfolio_routes.fetch_portfolio_data', return_value=(None, ["FAIL"], None))
+    # Mock benchmark fetch (might not be reached, but good practice)
+    mocker.patch('portfolio_routes.fetch_benchmark_data', return_value=(None, None))
+    # Mock CSV generation (should not be reached)
+    mocker.patch('portfolio_routes.generate_returns_csv', return_value=(None, None))
+
+    query_params = {
+        "tickers": "FAIL", "weights": "100", "start_date": "2023-01-01", "end_date": "2023-01-31"
+    }
+    response = client.get('/download_returns', query_string=query_params)
+
+    assert response.status_code == 400 # Error during fetch should be 400
+    assert response.content_type == 'application/json'
+    json_data = response.get_json()
+    assert 'error' in json_data
+    assert "Could not fetch data for: FAIL" in json_data['error']
+
+def test_download_returns_benchmark_fetch_warning(client, mocker, sample_portfolio_data, mock_csv_data):
+    """Test download continues but logs warning if only benchmark fetch fails."""
+    mocker.patch('portfolio_routes.validate_portfolio_input', return_value=(
+        {
+            "tickers": ["AAPL"], "weights": [100], "weights_normalized": [1.0],
+            "start_date": "2023-01-01", "end_date": "2023-01-31", "benchmark_ticker": "FAILBENCH"
+        }, 
+        None
+    ))
+    mocker.patch('portfolio_routes.fetch_portfolio_data', return_value=(sample_portfolio_data, None, None))
+    # Mock benchmark fetch to return an error message
+    mocker.patch('portfolio_routes.fetch_benchmark_data', return_value=(None, "Error fetching benchmark"))
+    # Mock CSV generation (should still be called, potentially with benchmark_df=None)
+    mocker.patch('portfolio_routes.generate_returns_csv', return_value=(mock_csv_data, "portfolio_vs_FAILBENCH_returns.csv"))
+
+    query_params = {
+        "tickers": "AAPL", "weights": "100", "start_date": "2023-01-01", "end_date": "2023-01-31", "benchmark_ticker": "FAILBENCH"
+    }
+
+    response = client.get('/download_returns', query_string=query_params)
+
+    # Should still succeed as portfolio data is present
+    assert response.status_code == 200 
+    assert response.mimetype == 'text/csv'
+    # Log message is checked manually or with log capturing if needed
+
+def test_download_returns_csv_generation_error(client, mocker, sample_portfolio_data, sample_benchmark_data):
+    """Test download returns handles errors during CSV generation itself."""
+    mocker.patch('portfolio_routes.validate_portfolio_input', return_value=(
+        {
+            "tickers": ["AAPL"], "weights": [100], "weights_normalized": [1.0],
+            "start_date": "2023-01-01", "end_date": "2023-01-31", "benchmark_ticker": "SPY"
+        }, 
+        None
+    ))
+    mocker.patch('portfolio_routes.fetch_portfolio_data', return_value=(sample_portfolio_data, None, None))
+    mocker.patch('portfolio_routes.fetch_benchmark_data', return_value=(sample_benchmark_data, None))
+    # Mock CSV generation to return None (simulating failure)
+    mocker.patch('portfolio_routes.generate_returns_csv', return_value=None) 
+
+    query_params = {
+        "tickers": "AAPL", "weights": "100", "start_date": "2023-01-01", "end_date": "2023-01-31"
+    }
+    response = client.get('/download_returns', query_string=query_params)
+
+    assert response.status_code == 500 # Internal error if CSV generation fails
+    assert response.content_type == 'application/json'
+    json_data = response.get_json()
+    assert 'error' in json_data
+    assert "Failed to generate CSV data" in json_data['error']
 
 # --- Placeholder for Future Tests ---
 # REMOVE

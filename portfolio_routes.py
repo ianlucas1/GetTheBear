@@ -363,7 +363,7 @@ def download_returns():
         return Response(
             csv_buffer.getvalue(),
             mimetype="text/csv",
-            headers={"Content-disposition": f"attachment; filename={filename}"},
+            headers={"Content-disposition": f'attachment; filename={filename}'},
         )
 
     except Exception as e:

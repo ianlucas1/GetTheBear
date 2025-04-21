@@ -3,14 +3,14 @@
  * Main JavaScript File
  */
 
-// Import chart functions
+// Import chart functions (now just the creation functions)
 import {
     createEquityCurveChart,
     createDrawdownChart,
     createAnnualReturnsChart,
     createAllocationChart,
     createCorrelationChart,
-    ensureChartComponentsRegistered
+    setupTabs // Import setupTabs from index.js
 } from './modules/charts/index.js';
 
 // Import UI/Control modules
@@ -20,6 +20,7 @@ import { setupBenchmarkControl, getBenchmarkTicker } from './modules/benchmarkCo
 
 // Import utility functions
 import { showError, validatePortfolioForm } from './modules/utils/validation.js';
+// Note: chartUtils.js (renderChart) is used internally by chart modules, not directly here.
 
 // Initialize when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -28,20 +29,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /**
  * Initialize the application
- * This function sets up UI controls and ensures chart components are registered
+ * Sets up UI controls.
  */
-async function initializeApp() {
+function initializeApp() {
     console.log("Initializing application...");
     
     try {
-        // Register chart components first (async operation)
-        await ensureChartComponentsRegistered();
-        
         // Initialize UI controls
         initializeDatePicker();
         setupTickerControls();
         setupBenchmarkControl();
         setupAnalysisForm();
+        setupTabs(); // Setup tabs after the form is ready
         
         console.log("Application initialized successfully");
     } catch (error) {
@@ -51,72 +50,53 @@ async function initializeApp() {
 }
 
 /**
- * Setup the analysis form submission
+ * Setup the analysis form submission and tab controls.
  */
 function setupAnalysisForm() {
     const analysisForm = document.getElementById('analysis-form');
     const submitBtn = document.getElementById('analyze-btn');
     const downloadBtn = document.getElementById('download-returns-btn');
     
-    if (!analysisForm || !submitBtn || !downloadBtn) return;
+    if (!analysisForm || !submitBtn || !downloadBtn) {
+        console.error("Form elements (analysis-form, analyze-btn, download-returns-btn) not found.");
+        return;
+    }
     
     // Form submission handler
-    analysisForm.addEventListener('submit', function(e) {
+    analysisForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        analyzePortfolio();
+        await analyzePortfolio(); // Make call async
     });
     
     // Download returns button
     downloadBtn.addEventListener('click', function() {
-        downloadReturns();
+        downloadReturns(); // This can remain synchronous
     });
-    
-    // Tab switching (Keep this logic here for now)
-    const tablist = document.querySelector('.tabs[role="tablist"]');
-    const tabs = tablist ? tablist.querySelectorAll('.tab[role="tab"]') : [];
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            // Find the previously selected tab and set aria-selected to false
-            const previousSelectedTab = tablist.querySelector('.tab[aria-selected="true"]');
-            if (previousSelectedTab) {
-                previousSelectedTab.classList.remove('active');
-                previousSelectedTab.setAttribute('aria-selected', 'false');
-            }
-            
-            // Set aria-selected to true on the clicked tab
-            this.classList.add('active');
-            this.setAttribute('aria-selected', 'true');
-            
-            // Show corresponding content
-            const tabId = this.getAttribute('data-tab');
-            document.querySelectorAll('.tab-content[role="tabpanel"]').forEach(content => {
-                content.classList.remove('active');
-            });
-            document.getElementById(tabId).classList.add('active');
-        });
-    });
+    // Tab switching logic is now handled by setupTabs() in modules/charts/index.js
+    // We call setupTabs() within initializeApp()
 }
 
 /**
- * Show loading spinner
+ * Show/Hide loading spinner
+ * @param {boolean} show - Whether to show or hide the loader
  */
 function showLoading(show) {
     const loader = document.getElementById('loader');
     if (loader) {
-        loader.style.display = show ? 'block' : 'none';
+        loader.style.display = show ? 'flex' : 'none'; // Use flex for centering if needed by CSS
     }
 }
 
 /**
- * Analyze portfolio
+ * Analyze portfolio: fetch data and trigger result display
  */
 async function analyzePortfolio() {
     // Hide any previous errors and results
     const errorElement = document.getElementById('error-message');
     const resultsContainer = document.getElementById('results-container');
     if (errorElement) errorElement.style.display = 'none';
-    if (resultsContainer) resultsContainer.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'none'; // Hide results initially
     
     // Show loading indicator
     showLoading(true);
@@ -129,7 +109,7 @@ async function analyzePortfolio() {
         return; // Validation failed inside getFormData
     }
     
-    // ---- Send request to server (now with CSRF token) ----
+    // ---- Send request to server ----
     const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
     const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
 
@@ -143,20 +123,35 @@ async function analyzePortfolio() {
             body: JSON.stringify(formData)
         });
         
+        // Check for non-OK responses (like 400, 500 handled by Flask but good practice)
+        if (!response.ok) {
+            let errorMsg = `Server error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorMsg; // Use server error if available
+            } catch (jsonError) {
+                // Ignore if response wasn't JSON
+            }
+            throw new Error(errorMsg); // Throw an error to be caught below
+        }
+
         const data = await response.json();
         
         showLoading(false);
+
+        // Check for application-level errors returned in JSON
         if (data.error) {
-            showError(data.error); // Use imported showError
+            showError(data.error);
             return;
         }
         
         // Display results
         await displayResults(data);
+
     } catch (err) {
         showLoading(false);
-        showError('An error occurred while analyzing the portfolio. Please try again.'); // Use imported showError
-        console.error('Error:', err);
+        showError(`An error occurred: ${err.message || 'Please try again.'}`);
+        console.error('Analysis Error:', err);
     }
 }
 
@@ -174,9 +169,10 @@ function getFormData() {
         return null; // Validation messages are shown by validatePortfolioForm
     }
     
+    // Return structured data
     return {
         tickers,
-        weights,
+        weights, // Weights are already in % (e.g., 50 for 50%)
         start_date,
         end_date,
         benchmark_ticker
@@ -184,320 +180,325 @@ function getFormData() {
 }
 
 /**
- * Display analysis results
+ * Display analysis results: metrics, notices, charts, summary
  */
 async function displayResults(data) {
-    try {
-        // Ensure Chart.js is ready before proceeding
-        await ensureChartComponentsRegistered();
-        
-        // Show results container
-        document.getElementById('results-container').style.display = 'block';
-        
-        // Enable download button
-        document.getElementById('download-returns-btn').disabled = false;
-        
-        // Get the benchmark ticker name to display
-        const benchmarkTicker = data.chart_data.benchmark_ticker || 'SPY';
-        
-        // Update benchmark header in the metrics table
-        document.getElementById('benchmark-header').textContent = `Benchmark (${benchmarkTicker})`;
+    // No need for ensureChartComponentsRegistered call here anymore
+
+    // Show results container
+    const resultsContainer = document.getElementById('results-container');
+    if (!resultsContainer) return; // Should not happen, but guard anyway
+    resultsContainer.style.display = 'block';
     
-        // Display metrics for portfolio and benchmark
-        displayMetrics(data.metrics, data.benchmark_metrics);
-        
-        // Handle the benchmark in portfolio notice
-        const benchmarkNotice = document.getElementById('benchmark-in-portfolio-notice');
-        const benchmarkNameNotice = document.getElementById('benchmark-name-notice');
-        
-        if (data.chart_data.benchmark_in_portfolio) {
-            // Update the notice text with the benchmark ticker
-            benchmarkNameNotice.textContent = benchmarkTicker;
-            benchmarkNotice.style.display = 'block';
-            
-            // Add "(Benchmark)" label to ticker in the portfolio
-            if (data.chart_data.benchmark_index >= 0) {
-                const tickerRows = document.querySelectorAll('.ticker-item');
-                if (tickerRows.length > data.chart_data.benchmark_index) {
-                    const benchmarkRow = tickerRows[data.chart_data.benchmark_index];
-                    const tickerInput = benchmarkRow.querySelector('.ticker-input');
-                    if (tickerInput) {
-                        // Make sure we don't add the label multiple times
-                        if (!tickerInput.value.includes('(BENCHMARK)')) {
-                            tickerInput.value = `${tickerInput.value.toUpperCase()} (BENCHMARK)`;
-                        }
-                    }
+    // Enable download button
+    const downloadBtn = document.getElementById('download-returns-btn');
+    if (downloadBtn) downloadBtn.disabled = false;
+    
+    // Get benchmark ticker name
+    const benchmarkTicker = data.chart_data?.benchmark_ticker || 'SPY'; // Use optional chaining
+    
+    // Update benchmark header in the metrics table
+    const benchmarkHeader = document.getElementById('benchmark-header');
+    if (benchmarkHeader) benchmarkHeader.textContent = `Benchmark (${benchmarkTicker})`;
+
+    // Display metrics table
+    displayMetrics(data.metrics, data.benchmark_metrics);
+    
+    // Handle benchmark in portfolio notice
+    handleBenchmarkNotice(data.chart_data, benchmarkTicker);
+    
+    // --- Prepare data for charts --- 
+    // Get the original tickers and weights *as entered by the user* for allocation chart
+    const { tickers: originalTickers, weights: originalWeights } = getTickersAndWeights(false); // Pass false to not clean benchmark label
+    
+    // Normalize weights to sum to 1 for allocation chart (weights are 0-100)
+    const totalWeight = originalWeights.reduce((a, b) => a + b, 0);
+    const normalizedWeights = totalWeight > 0 ? originalWeights.map(w => w / totalWeight) : [];
+
+    // --- Create charts --- 
+    // Use Promise.allSettled to attempt rendering all charts even if one fails.
+    const chartPromises = [
+        createEquityCurveChart('equity-chart', data.chart_data),
+        createDrawdownChart('drawdown-chart', data.chart_data),
+        createAnnualReturnsChart('returns-chart', data.chart_data),
+        createAllocationChart('allocation-chart', 'allocation-legend', originalTickers, normalizedWeights)
+    ];
+    
+    // Add correlation chart if data is valid
+    if (data.correlation_matrix?.tickers?.length > 1) {
+        chartPromises.push(createCorrelationChart('correlation-chart', data.correlation_matrix));
+    } else {
+         // Clear or hide the correlation chart container if no data
+         const corrContainer = document.getElementById('correlation-chart');
+         if (corrContainer) corrContainer.innerHTML = '<div class="chart-info">Correlation matrix requires at least 2 tickers.</div>';
+    }
+    
+    // Wait for all chart rendering attempts to complete
+    const results = await Promise.allSettled(chartPromises);
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            // Error handling is done within renderChart, but log here too if needed
+            console.error(`Chart rendering failed (index ${index}):`, result.reason);
+        }
+    });
+    console.log("Chart rendering process finished.");
+
+    // --- Create summary view --- 
+    createSummaryView(data.metrics, data.benchmark_metrics);
+    
+    // Scroll to results after a short delay to allow rendering
+    setTimeout(() => {
+        resultsContainer.scrollIntoView({ behavior: 'smooth' });
+    }, 100); 
+}
+
+/**
+ * Handles showing/hiding the notice about the benchmark being in the portfolio
+ * and updates the ticker label in the form.
+ */
+function handleBenchmarkNotice(chartData, benchmarkTicker) {
+    const benchmarkNotice = document.getElementById('benchmark-in-portfolio-notice');
+    const benchmarkNameNotice = document.getElementById('benchmark-name-notice');
+
+    if (!benchmarkNotice || !benchmarkNameNotice) return;
+
+    if (chartData?.benchmark_in_portfolio) {
+        benchmarkNameNotice.textContent = benchmarkTicker;
+        benchmarkNotice.style.display = 'block';
+
+        // Add "(Benchmark)" label to the corresponding ticker input field
+        if (chartData.benchmark_index >= 0) {
+            const tickerRows = document.querySelectorAll('.ticker-item');
+            if (tickerRows.length > chartData.benchmark_index) {
+                const benchmarkRow = tickerRows[chartData.benchmark_index];
+                const tickerInput = benchmarkRow.querySelector('.ticker-input');
+                if (tickerInput && !tickerInput.value.includes('(BENCHMARK)')) {
+                    // Find the actual ticker symbol before adding the label
+                    const currentTicker = tickerInput.value.trim().split(' (')[0].toUpperCase();
+                    tickerInput.value = `${currentTicker} (BENCHMARK)`; 
                 }
             }
-        } else {
-            benchmarkNotice.style.display = 'none';
         }
-        
-        // Get the original tickers and weights from the form
-        const originalTickers = [];
-        const originalWeights = [];
-        
-        document.querySelectorAll('.ticker-item').forEach(item => {
-            const ticker = item.querySelector('.ticker-input').value.trim().split(' (')[0];
-            const weight = parseFloat(item.querySelector('.weight-input').value);
-            if (ticker && !isNaN(weight) && weight > 0) {
-                originalTickers.push(ticker);
-                originalWeights.push(weight);
+    } else {
+        benchmarkNotice.style.display = 'none';
+        // Optional: Clean up any existing (BENCHMARK) labels from previous runs
+        document.querySelectorAll('.ticker-input').forEach(input => {
+            if (input.value.includes('(BENCHMARK)')) {
+                 input.value = input.value.replace(/\s*\(BENCHMARK\)/i, '').trim();
             }
         });
-        
-        // Normalize weights to sum to 1 for pie chart
-        const totalWeight = originalWeights.reduce((a, b) => a + b, 0);
-        const normalizedWeights = originalWeights.map(w => w / totalWeight);
-        
-        // Create charts (using imported functions asynchronously)
-        await Promise.all([
-            createEquityCurveChart('equity-chart', data.chart_data),
-            createDrawdownChart('drawdown-chart', data.chart_data),
-            createAnnualReturnsChart('returns-chart', data.chart_data),
-            createAllocationChart('allocation-chart', 'allocation-legend', originalTickers, normalizedWeights)
-        ]);
-        
-        // Create correlation heatmap if data is available
-        if (data.correlation_matrix && data.correlation_matrix.tickers && data.correlation_matrix.tickers.length > 1) {
-            await createCorrelationChart('correlation-chart', data.correlation_matrix);
-        }
-        
-        // Create summary view with key metrics
-        createSummaryView(data.metrics, data.benchmark_metrics);
-        
-        // Scroll to results
-        document.getElementById('results-container').scrollIntoView({
-            behavior: 'smooth'
-        });
-    } catch (error) {
-        console.error("Error displaying results:", error);
-        showError("Failed to display analysis results. Please try again.");
     }
 }
 
+
 /**
- * Display metrics in the metrics table
+ * Display metrics in the metrics table - Refactored for template literals
  */
 function displayMetrics(portfolioMetrics, benchmarkMetrics) {
-    // Helper function to format values and handle NaN/null/undefined
-    function formatValue(value) {
-        if (!value || value === 'N/A' || value === 'nan%' || value === 'null%') {
-            return '0.00%';
+    const tableBody = document.querySelector('.metrics-table tbody');
+    if (!tableBody) return;
+
+    // Helper to format values, handling N/A, null, NaN
+    function formatValue(value, type = 'percent') {
+        if (value === null || value === undefined || value === 'N/A' || String(value).toLowerCase() === 'nan%' || String(value).toLowerCase() === 'null%') {
+            return type === 'percent' ? '0.00%' : (type === 'months' ? '0 months' : '0.00');
         }
-        return value;
+        // If it's already formatted (contains %), return as is
+        if (typeof value === 'string' && value.includes('%')) {
+            return value;
+        }
+        // If it's a duration string
+        if (typeof value === 'string' && value.includes('months')) {
+             return value;
+        }
+        // If it's years (number)
+        if (type === 'years') {
+             return `${value} years`;
+        }
+        // Format numbers as percentage or fixed decimal
+        if (typeof value === 'number') {
+             if (type === 'percent') {
+                 return `${(value * 100).toFixed(2)}%`; // Assuming input value is decimal for % 
+             } else if (type === 'ratio') {
+                  return value.toFixed(2);
+             }
+        }
+        // Fallback for unexpected types or pre-formatted strings without %
+        return String(value);
     }
-    
-    // Make sure all value cells are right-aligned
-    const allValueCells = document.querySelectorAll('.metrics-table td.value-cell');
-    allValueCells.forEach(cell => {
-        cell.classList.add('text-end');
+
+     // Helper to generate CSS class for positive/negative values
+    function getColorClass(valueStr, metricId) {
+        if (!valueStr || valueStr === 'N/A' || valueStr === '0.00%' || valueStr === '0.00') {
+            return '';
+        }
+        const numValue = parseFloat(valueStr.replace('%', ''));
+        if (isNaN(numValue)) return '';
+
+        // Lower (less negative) drawdown is good
+        const isDrawdown = metricId.includes('max-drawdown');
+        if (isDrawdown) {
+            return numValue > -10 ? 'positive' : 'negative'; // Threshold for drawdown color
+        } else {
+            // Standard: positive numbers are good
+            return numValue >= 0 ? 'positive' : 'negative';
+        }
+    }
+
+    // Define metrics and their formatting/IDs
+    const metricsMap = [
+        { label: 'CAGR', id: 'cagr', type: 'percent' },
+        { label: 'Volatility', id: 'volatility', type: 'percent' },
+        { label: 'Sharpe Ratio', id: 'sharpe', type: 'ratio' }, // Corrected ID
+        { label: 'Max Drawdown', id: 'max-drawdown', type: 'percent' },
+        { label: 'Max Drawdown Duration', id: 'max-drawdown-duration', type: 'months' },
+        { label: 'Sortino Ratio', id: 'sortino-ratio', type: 'ratio' },
+        { label: 'Calmar Ratio', id: 'calmar-ratio', type: 'ratio' },
+        { label: 'Total Return', id: 'total-return', type: 'percent' },
+        { label: 'Rolling 12M Return', id: 'rolling-return', type: 'percent' },
+        { label: 'Rolling 12M Volatility', id: 'rolling-volatility', type: 'percent' },
+        { label: 'Best Month', id: 'best-month', type: 'percent' },
+        { label: 'Worst Month', id: 'worst-month', type: 'percent' },
+        { label: 'Time Period', id: 'period', type: 'years' } // Special case
+    ];
+
+    let tableHTML = '';
+
+    metricsMap.forEach(metric => {
+        const portfolioKey = metric.id.replace(/-/g, '_'); // Convert ID to snake_case for data keys
+        const portfolioRawValue = portfolioMetrics ? portfolioMetrics[portfolioKey] : null;
+        const benchmarkRawValue = benchmarkMetrics ? benchmarkMetrics[portfolioKey] : null;
+
+        // Format values
+        const portfolioDisplayValue = formatValue(portfolioRawValue, metric.type);
+        let benchmarkDisplayValue = '--';
+        if (metric.id !== 'period') {
+            benchmarkDisplayValue = benchmarkMetrics ? formatValue(benchmarkRawValue, metric.type) : formatValue(null, metric.type);
+        }
+
+        // Get color classes
+        const portfolioColorClass = getColorClass(portfolioDisplayValue, metric.id);
+        const benchmarkColorClass = (metric.id !== 'period' && benchmarkMetrics) ? getColorClass(benchmarkDisplayValue, `benchmark-${metric.id}`) : '';
+
+        tableHTML += `
+            <tr>
+                <td>${metric.label}</td>
+                <td id="${metric.id}-value" class="value-cell text-end ${portfolioColorClass}">${portfolioDisplayValue}</td>
+                ${metric.id !== 'period' ? 
+                    `<td id="benchmark-${metric.id}-value" class="value-cell text-end ${benchmarkColorClass}">${benchmarkDisplayValue}</td>` : 
+                    '<td class="value-cell text-right">--</td>' // Placeholder for period row benchmark cell
+                }
+            </tr>
+        `;
     });
-    
-    // Portfolio metrics - existing metrics
-    document.getElementById('cagr-value').textContent = formatValue(portfolioMetrics.cagr);
-    document.getElementById('volatility-value').textContent = formatValue(portfolioMetrics.volatility);
-    document.getElementById('sharpe-value').textContent = formatValue(portfolioMetrics.sharpe_ratio);
-    document.getElementById('max-drawdown-value').textContent = formatValue(portfolioMetrics.max_drawdown);
-    document.getElementById('best-month-value').textContent = formatValue(portfolioMetrics.best_month);
-    document.getElementById('worst-month-value').textContent = formatValue(portfolioMetrics.worst_month);
-    document.getElementById('total-return-value').textContent = formatValue(portfolioMetrics.total_return);
-    document.getElementById('period-value').textContent = `${portfolioMetrics.years} years`;
-    
-    // Portfolio metrics - new metrics
-    document.getElementById('sortino-ratio-value').textContent = formatValue(portfolioMetrics.sortino_ratio);
-    document.getElementById('calmar-ratio-value').textContent = formatValue(portfolioMetrics.calmar_ratio);
-    document.getElementById('max-drawdown-duration-value').textContent = portfolioMetrics.max_drawdown_duration || '0 months';
-    document.getElementById('rolling-volatility-value').textContent = formatValue(portfolioMetrics.rolling_volatility);
-    document.getElementById('rolling-return-value').textContent = formatValue(portfolioMetrics.rolling_return);
-    
-    // Benchmark metrics if available
-    if (benchmarkMetrics) {
-        // Existing benchmark metrics
-        document.getElementById('benchmark-cagr-value').textContent = formatValue(benchmarkMetrics.cagr);
-        document.getElementById('benchmark-volatility-value').textContent = formatValue(benchmarkMetrics.volatility);
-        document.getElementById('benchmark-sharpe-value').textContent = formatValue(benchmarkMetrics.sharpe_ratio);
-        document.getElementById('benchmark-max-drawdown-value').textContent = formatValue(benchmarkMetrics.max_drawdown);
-        document.getElementById('benchmark-best-month-value').textContent = formatValue(benchmarkMetrics.best_month);
-        document.getElementById('benchmark-worst-month-value').textContent = formatValue(benchmarkMetrics.worst_month);
-        document.getElementById('benchmark-total-return-value').textContent = formatValue(benchmarkMetrics.total_return);
-        
-        // New benchmark metrics
-        document.getElementById('benchmark-sortino-ratio-value').textContent = formatValue(benchmarkMetrics.sortino_ratio);
-        document.getElementById('benchmark-calmar-ratio-value').textContent = formatValue(benchmarkMetrics.calmar_ratio);
-        document.getElementById('benchmark-max-drawdown-duration-value').textContent = benchmarkMetrics.max_drawdown_duration || '0 months';
-        document.getElementById('benchmark-rolling-volatility-value').textContent = formatValue(benchmarkMetrics.rolling_volatility);
-        document.getElementById('benchmark-rolling-return-value').textContent = formatValue(benchmarkMetrics.rolling_return);
-        
-        // Add color classes to benchmark values - existing metrics
-        colorizeValue('benchmark-total-return-value', formatValue(benchmarkMetrics.total_return));
-        colorizeValue('benchmark-cagr-value', formatValue(benchmarkMetrics.cagr));
-        colorizeValue('benchmark-max-drawdown-value', formatValue(benchmarkMetrics.max_drawdown));
-        colorizeValue('benchmark-best-month-value', formatValue(benchmarkMetrics.best_month));
-        colorizeValue('benchmark-worst-month-value', formatValue(benchmarkMetrics.worst_month));
-        
-        // Add color classes to benchmark values - new ratio metrics
-        colorizeValue('benchmark-sortino-ratio-value', formatValue(benchmarkMetrics.sortino_ratio));
-        colorizeValue('benchmark-calmar-ratio-value', formatValue(benchmarkMetrics.calmar_ratio));
-        colorizeValue('benchmark-rolling-return-value', formatValue(benchmarkMetrics.rolling_return));
-    } else {
-        // If no benchmark data, display 0.00% for all benchmark metrics
-        const benchmarkElements = [
-            // Existing benchmark metrics
-            'benchmark-cagr-value', 'benchmark-volatility-value', 'benchmark-sharpe-value',
-            'benchmark-max-drawdown-value', 'benchmark-best-month-value', 'benchmark-worst-month-value',
-            'benchmark-total-return-value',
-            // New benchmark metrics
-            'benchmark-sortino-ratio-value', 'benchmark-calmar-ratio-value', 
-            'benchmark-rolling-volatility-value',
-            'benchmark-rolling-return-value'
-        ];
-        benchmarkElements.forEach(elementId => {
-            document.getElementById(elementId).textContent = '0.00%';
-        });
-        document.getElementById('benchmark-max-drawdown-duration-value').textContent = '0 months';
-    }
-    
-    // Add color classes to portfolio values - existing metrics
-    colorizeValue('total-return-value', formatValue(portfolioMetrics.total_return));
-    colorizeValue('cagr-value', formatValue(portfolioMetrics.cagr));
-    colorizeValue('max-drawdown-value', formatValue(portfolioMetrics.max_drawdown));
-    colorizeValue('best-month-value', formatValue(portfolioMetrics.best_month));
-    colorizeValue('worst-month-value', formatValue(portfolioMetrics.worst_month));
-    
-    // Add color classes to portfolio values - new ratio metrics
-    colorizeValue('sortino-ratio-value', formatValue(portfolioMetrics.sortino_ratio));
-    colorizeValue('calmar-ratio-value', formatValue(portfolioMetrics.calmar_ratio));
-    colorizeValue('rolling-return-value', formatValue(portfolioMetrics.rolling_return));
+
+    tableBody.innerHTML = tableHTML;
 }
 
+
 /**
- * Create summary view with key metrics
+ * Create summary view using template literals
  */
 function createSummaryView(portfolioMetrics, benchmarkMetrics) {
     const summaryContainer = document.getElementById('summary-metrics');
     if (!summaryContainer) return;
-    
-    // Helper function to format values and handle NaN/null/undefined
-    function formatValue(value) {
-        if (!value || value === 'N/A' || value === 'nan%' || value === 'null%') {
-            return '0.00%';
+
+    // Helper functions (copied from displayMetrics for now, consider moving to utils)
+    function formatValue(value, type = 'percent') {
+        if (value === null || value === undefined || value === 'N/A' || String(value).toLowerCase() === 'nan%' || String(value).toLowerCase() === 'null%') {
+            return type === 'percent' ? '0.00%' : (type === 'ratio' ? '0.00' : '0.00');
         }
-        return value;
+        if (typeof value === 'string' && value.includes('%')) return value;
+         if (typeof value === 'number') {
+             if (type === 'percent') return `${(value * 100).toFixed(2)}%`;
+             if (type === 'ratio') return value.toFixed(2);
+        }
+        return String(value);
+    }
+    function getColorClass(valueStr, metricId) {
+        if (!valueStr || valueStr === 'N/A' || valueStr === '0.00%' || valueStr === '0.00') return '';
+        const numValue = parseFloat(valueStr.replace('%', ''));
+        if (isNaN(numValue)) return '';
+        const isDrawdown = metricId.includes('max-drawdown');
+        if (isDrawdown) return numValue > -10 ? 'positive' : 'negative';
+        else return numValue >= 0 ? 'positive' : 'negative';
     }
     
-    summaryContainer.innerHTML = ''; // Clear any existing content
-    
-    // Key metrics to display in the summary
-    const keyMetrics = [
-        { id: 'total-return', label: 'Total Return', value: formatValue(portfolioMetrics.total_return) },
-        { id: 'cagr', label: 'CAGR', value: formatValue(portfolioMetrics.cagr) },
-        { id: 'volatility', label: 'Volatility', value: formatValue(portfolioMetrics.volatility) },
-        { id: 'sharpe', label: 'Sharpe Ratio', value: formatValue(portfolioMetrics.sharpe_ratio) },
-        { id: 'max-drawdown', label: 'Max Drawdown', value: formatValue(portfolioMetrics.max_drawdown) },
-        { id: 'sortino', label: 'Sortino Ratio', value: formatValue(portfolioMetrics.sortino_ratio) },
-        { id: 'calmar', label: 'Calmar Ratio', value: formatValue(portfolioMetrics.calmar_ratio) },
-        { id: 'rolling-return', label: 'TTM Return', value: formatValue(portfolioMetrics.rolling_return) }
+    summaryContainer.innerHTML = ''; // Clear previous content
+
+    // Key metrics definition
+     const keyMetrics = [
+        { id: 'total-return', label: 'Total Return', type: 'percent' },
+        { id: 'cagr', label: 'CAGR', type: 'percent' },
+        { id: 'volatility', label: 'Volatility', type: 'percent' },
+        { id: 'sharpe', label: 'Sharpe Ratio', type: 'ratio' }, // Use correct ID
+        { id: 'max-drawdown', label: 'Max Drawdown', type: 'percent' },
+        { id: 'sortino-ratio', label: 'Sortino Ratio', type: 'ratio' },
+        { id: 'calmar-ratio', label: 'Calmar Ratio', type: 'ratio' },
+        { id: 'rolling-return', label: 'TTM Return', type: 'percent' }
     ];
-    
-    // Add each metric to the summary
+
+    let summaryHTML = '';
+
     keyMetrics.forEach(metric => {
-        const metricElement = document.createElement('div');
-        metricElement.className = 'metric-card';
-        
-        const metricTitle = document.createElement('div');
-        metricTitle.className = 'metric-title';
-        metricTitle.textContent = metric.label;
-        
-        const metricValue = document.createElement('div');
-        metricValue.className = 'metric-value';
-        metricValue.textContent = metric.value;
-        
-        // Add color class
-        if (metric.value !== 'N/A' && metric.value !== '0.00%') {
-            const numValue = parseFloat(metric.value.replace('%', ''));
-            if (!isNaN(numValue)) {
-                // For drawdown, negative is actually positive (less drawdown is good)
-                if (metric.id === 'max-drawdown') {
-                    metricValue.classList.add(numValue > -10 ? 'positive' : 'negative');
-                } else {
-                    metricValue.classList.add(numValue >= 0 ? 'positive' : 'negative');
-                }
-            }
-        }
-        
-        const benchmarkValue = document.createElement('div');
-        benchmarkValue.className = 'benchmark-value';
+        const portfolioKey = metric.id.replace(/-/g, '_');
+        const portfolioRawValue = portfolioMetrics ? portfolioMetrics[portfolioKey] : null;
+        const portfolioDisplayValue = formatValue(portfolioRawValue, metric.type);
+        const portfolioColorClass = getColorClass(portfolioDisplayValue, metric.id);
+
+        let benchmarkDisplayValue = '0.00%'; // Default
+        if (metric.type === 'ratio') benchmarkDisplayValue = '0.00';
         
         if (benchmarkMetrics) {
-            const benchmarkKey = metric.id.replace(/-/g, '_');
-            const benchmarkMetricValue = formatValue(benchmarkMetrics[benchmarkKey] || '0.00%');
-            benchmarkValue.textContent = `Benchmark: ${benchmarkMetricValue}`;
-        } else {
-            benchmarkValue.textContent = 'Benchmark: 0.00%';
+            const benchmarkRawValue = benchmarkMetrics[portfolioKey]; // Already snake_case
+            benchmarkDisplayValue = formatValue(benchmarkRawValue, metric.type);
         }
-        
-        metricElement.appendChild(metricTitle);
-        metricElement.appendChild(metricValue);
-        metricElement.appendChild(benchmarkValue);
-        
-        summaryContainer.appendChild(metricElement);
+
+        summaryHTML += `
+            <div class="metric-card">
+                <div class="metric-title">${metric.label}</div>
+                <div class="metric-value ${portfolioColorClass}">${portfolioDisplayValue}</div>
+                <div class="benchmark-value">Benchmark: ${benchmarkDisplayValue}</div>
+            </div>
+        `;
     });
+
+    summaryContainer.innerHTML = summaryHTML;
 }
 
-/**
- * Add positive/negative color classes to values
- */
-function colorizeValue(elementId, value) {
-    const element = document.getElementById(elementId);
-    element.classList.remove('positive', 'negative');
-    
-    if (value !== 'N/A' && value !== '0.00%') {
-        // Extract numeric part from percentage string
-        const numValue = parseFloat(value.replace('%', ''));
-        
-        if (!isNaN(numValue)) {
-            // For drawdown, negative is actually positive (less drawdown is good)
-            if (elementId === 'max-drawdown-value' || elementId === 'benchmark-max-drawdown-value') {
-                element.classList.add(numValue > -10 ? 'positive' : 'negative');
-            } else {
-                element.classList.add(numValue >= 0 ? 'positive' : 'negative');
-            }
-        }
-    }
-}
 
 /**
- * Download returns CSV with portfolio and benchmark data
+ * Download returns CSV
  */
 function downloadReturns() {
+    // No change needed here unless form data structure changes
     showLoading(true);
-    
-    // Gather and validate form data using the refactored function
     const formData = getFormData();
-    
-    // Validate form data
     if (!formData) {
         showLoading(false);
-        return; // Validation errors shown by getFormData/validatePortfolioForm
+        return;
     }
     
-    // Get the benchmark ticker
-    const benchmarkTicker = formData.benchmark_ticker;
+    const { tickers, weights, start_date, end_date, benchmark_ticker } = formData;
     
     // Construct URL with query parameters
-    const url = `/download_returns?tickers=${formData.tickers.join(',')}&weights=${formData.weights.join(',')}&start_date=${formData.start_date}&end_date=${formData.end_date}&benchmark_ticker=${benchmarkTicker}`;
+    const queryParams = new URLSearchParams({
+        tickers: tickers.join(','),
+        weights: weights.join(','),
+        start_date,
+        end_date,
+        benchmark_ticker
+    });
+    const url = `/download_returns?${queryParams.toString()}`;
     
-    // Create filename with benchmark ticker
-    const filename = `portfolio_vs_${benchmarkTicker}_returns.csv`;
+    // Create filename
+    const filename = `portfolio_vs_${benchmark_ticker || 'benchmark'}_returns_${start_date}_to_${end_date}.csv`;
     
-    // Create temporary link to download the file
+    // Create temporary link and click
     const link = document.createElement('a');
     link.href = url;
-    link.target = '_blank';
+    link.target = '_blank'; // Open in new tab/window if direct download fails
     link.download = filename;
-    
-    // Append to document, click, and remove
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

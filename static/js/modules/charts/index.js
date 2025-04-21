@@ -1,107 +1,31 @@
 /**
- * Charts‑module index
- *  ‑ imports individual chart helpers
- *  ‑ re‑exports them for ES‑modules
- *  ‑ exposes them on window for classic scripts (main.js)
+ * static/js/modules/charts/index.js
+ * 
+ * Re-exports individual chart creation functions.
+ * Assumes necessary Chart.js components are registered either via 
+ * chart.auto.min.js or specific imports/registrations elsewhere.
  */
 
+// Import individual chart creation functions
 import { createEquityCurveChart }   from './equityCurve.js';
 import { createDrawdownChart }      from './drawdown.js';
 import { createAnnualReturnsChart } from './annualReturns.js';
 import { createAllocationChart }    from './allocation.js';
 import { createCorrelationChart }   from './correlation.js';
-import { ChartModule, getMatrixController } from '../../charts.js';
 
-let chartComponentsRegistered = false;
+// Optional: Import ChartModule or specific controllers/elements if needed
+// for advanced configuration or checks within this index file, but generally
+// individual chart files should handle their specific needs.
+// import { ChartModule, getMatrixController } from '../../charts.js';
 
-/**
- * Ensures necessary Chart.js components are registered once.
- * Should be called by chart creation functions before using Chart.
- */
-async function ensureChartComponentsRegistered() {
-    if (chartComponentsRegistered) return true;
-
-    try {
-        // Wait for Chart to be available via our module system
-        const Chart = await ChartModule;
-        
-        if (!Chart) {
-            console.error("Chart.js global object not found even after waiting.");
-            return false;
-        }
-
-        // Get components from Chart
-        const {
-            // Common components
-            LineController, LineElement, PointElement,
-            BarController, BarElement,
-            CategoryScale, LinearScale, TimeScale,
-            Tooltip, Legend, Title, Filler,
-            // Elements for pie/doughnut charts
-            ArcElement, DoughnutController
-        } = Chart;
-
-        if (!Chart.register) {
-            console.error("Chart.register function not found.");
-            return false;
-        }
-
-        // Base components needed by most charts
-        const baseComponents = [
-            LineController, LineElement, PointElement,
-            BarController, BarElement,
-            CategoryScale, LinearScale, TimeScale,
-            Tooltip, Legend, Title, Filler
-        ].filter(Boolean); // Filter out undefined if any controller failed to load
-
-        if (baseComponents.length > 0) {
-            Chart.register(...baseComponents);
-            console.log("Base chart components registered successfully");
-        }
-
-        // Register doughnut components if available
-        if (ArcElement && DoughnutController) {
-            Chart.register(ArcElement, DoughnutController);
-            console.log("Doughnut components registered");
-        }
-
-        // Try to get MatrixController but don't block other charts if it fails
-        try {
-            const MatrixController = await getMatrixController();
-            if (MatrixController) {
-                // MatrixElement might be available on window.Chart
-                const MatrixElement = window.Chart && window.Chart.MatrixElement;
-                
-                if (!Chart.registry.getController('matrix')) {
-                    if (MatrixElement) {
-                        Chart.register(MatrixController, MatrixElement);
-                        console.log("Matrix components registered in index.js");
-                    } else {
-                        Chart.register(MatrixController);
-                        console.log("Matrix controller registered in index.js (element not found)");
-                    }
-                }
-            } else {
-                console.warn("Matrix components not available during registration in index.js");
-            }
-        } catch (matrixError) {
-            console.warn("Matrix registration error in index.js:", matrixError);
-            // Continue without matrix - it's handled separately in correlation.js
-        }
-
-        chartComponentsRegistered = true;
-        console.log("Chart.js components registered successfully.");
-        return true;
-
-    } catch (error) {
-        console.error("Error during Chart.js component registration:", error);
-        chartComponentsRegistered = false; // Mark as failed
-        return false;
-    }
-}
+/* 
+   No need for ensureChartComponentsRegistered anymore if using chart.auto.js 
+   and handling the custom matrix controller registration elsewhere or 
+   checking within createCorrelationChart itself.
+*/
 
 /* ------------------------------------------------------------------ *
- *  Tab handling
+ *  Tab handling (Keep as it relates to chart display areas) 
  * ------------------------------------------------------------------ */
 export function setupTabs() {
     const tablist = document.querySelector('.tabs[role="tablist"]');
@@ -117,47 +41,72 @@ export function setupTabs() {
             tab.classList.add('active');
             tab.setAttribute('aria-selected', 'true');
 
-            const id = tab.dataset.tab;
+            const id = tab.dataset.tab; // Use dataset for cleaner access
             document.querySelectorAll('.tab-content[role="tabpanel"]')
                     .forEach(p => p.classList.toggle('active', p.id === id));
         });
     });
+
+     // Ensure the default active tab's content is shown on initial load
+    const initialActiveTab = tablist.querySelector('.tab.active[aria-selected="true"]');
+    if (initialActiveTab) {
+        const initialTabId = initialActiveTab.dataset.tab;
+        document.querySelectorAll('.tab-content[role="tabpanel"]').forEach(p => { 
+             p.classList.toggle('active', p.id === initialTabId);
+        });
+    }
 }
 
 /* ------------------------------------------------------------------ *
- *  Chart creation orchestrator
+ *  Chart creation orchestrator (Simplified)
+ *  This function now primarily focuses on calling the individual chart 
+ *  creation functions with the appropriate data.
  * ------------------------------------------------------------------ */
 export async function createCharts(data, origTickers, origWeights) {
-    /* ensure Chart is ready */
-    await ensureChartComponentsRegistered();
+    // No need to explicitly wait for Chart.js registration here anymore,
+    // assuming layout.html loads scripts correctly.
     
     /* normalise weights for pie‑chart */
-    const total = (origWeights ?? []).reduce((a, b) => a + b, 0);
-    const norm  = total ? origWeights.map(w => w / total) : [];
+    const totalWeight = (origWeights ?? []).reduce((a, b) => a + b, 0);
+    const normalizedWeights = totalWeight > 0 ? origWeights.map(w => w / totalWeight) : [];
 
-    // Create all charts in parallel
+    // --- Create all charts --- 
+    // Use Promise.allSettled to attempt rendering all charts even if one fails.
     const chartPromises = [
         createEquityCurveChart('equity-chart', data.chart_data),
         createDrawdownChart('drawdown-chart', data.chart_data),
         createAnnualReturnsChart('returns-chart', data.chart_data),
-        createAllocationChart('allocation-chart', 'allocation-legend', origTickers, norm)
+        // Pass normalized weights to allocation chart
+        createAllocationChart('allocation-chart', 'allocation-legend', origTickers, normalizedWeights)
     ];
     
-    // Add correlation chart if data exists
+    // Add correlation chart promise if data is valid
     if (data.correlation_matrix?.tickers?.length > 1) {
         chartPromises.push(createCorrelationChart('correlation-chart', data.correlation_matrix));
+    } else {
+         // Optionally clear or hide the correlation chart container if no data
+         const corrContainer = document.getElementById('correlation-chart');
+         if (corrContainer) corrContainer.innerHTML = '<div class="chart-info">Correlation matrix requires at least 2 tickers.</div>';
     }
     
-    // Wait for all charts to render
-    await Promise.allSettled(chartPromises);
-    console.log("All charts created");
+    // Wait for all chart rendering attempts to complete
+    const results = await Promise.allSettled(chartPromises);
+    
+    // Log results (optional)
+    results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+            console.error(`Chart at index ${index} failed to render:`, result.reason);
+        }
+    });
+    
+    console.log("Chart creation process finished.");
 }
 
 /* ------------------------------------------------------------------ *
- *  ES‑module re‑exports
+ *  ES‑module re‑exports (for use in main.js or other modules)
  * ------------------------------------------------------------------ */
 export {
-    ensureChartComponentsRegistered,
+    // Removed ensureChartComponentsRegistered
     createEquityCurveChart,
     createDrawdownChart,
     createAnnualReturnsChart,

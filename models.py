@@ -11,13 +11,14 @@ class CacheEntry(db.Model):
     __tablename__ = 'portfolio_cache' # Explicit table name
 
     # Using a hash of the request parameters as the primary key
+    # String(64) accommodates SHA-256 hex digest length.
     id = db.Column(db.String(64), primary_key=True) 
     
     # Use generic JSON type for broader compatibility (SQLite, PostgreSQL)
     data = db.Column(db.JSON, nullable=False) 
     
-    # Timestamp for cache entry creation (UTC)
-    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Timestamp for cache entry creation (UTC), add index for faster querying
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     def __repr__(self):
         return f'<CacheEntry {self.id}>' 

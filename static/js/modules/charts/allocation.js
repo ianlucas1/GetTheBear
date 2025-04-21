@@ -1,136 +1,100 @@
 /*  static/js/modules/charts/allocation.js
     Draw a portfolio‑allocation donut (Chart.js v4)                 */
 
-// Import the registration helper and Chart module
-import { ensureChartComponentsRegistered } from './index.js';
-import { ChartModule } from '../../charts.js';
+// Import the chart rendering utility
+import { renderChart } from '../utils/chartUtils.js';
+// We still need ChartModule potentially for specific component access if needed later,
+// but registration should be handled centrally.
+import { ChartModule } from '../../charts.js'; 
 
-/* ------------------------------------------------------------------
-   (Optional) ensure the bits needed for a doughnut are registered.
-   ------------------------------------------------------------------ */
-   
 /**
  * Draw or update a portfolio‑allocation donut chart.
  *
- * @param {string}  canvasId   ID of the <canvas> to render into
+ * @param {string}  containerId   ID of the <div> to render into
  * @param {?string} legendId   ID of a <ul> for a custom legend (optional)
  * @param {string[]} labels    Ticker symbols e.g. ['VUG', 'TLT', …]
  * @param {number[]} weights   Normalised weights   e.g. [0.333, 0.333, …]
  */
-export async function createAllocationChart(canvasId, legendId, labels, weights) {
-  // Ensure Chart.js is ready and components are registered
-  const success = await ensureChartComponentsRegistered();
-  if (!success) {
-    console.error("Failed to register Chart.js components");
-    const container = document.getElementById(canvasId);
-    if (container) {
-      container.innerHTML = '<div class="chart-error">Chart library not properly initialized.</div>';
+export async function createAllocationChart(containerId, legendId, labels, weights) {
+    /* ── guards ──────────────────────────────────────────────────── */
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Allocation chart container '${containerId}' not found.`);
+        return;
     }
-    return;
-  }
-
-  // Get Chart object
-  const Chart = await ChartModule;
-  
-  // Explicitly register doughnut chart components
-  try {
-    // Check if components already registered
-    if (!Chart.registry.getController('doughnut')) {
-      if (Chart.ArcElement && Chart.DoughnutController) {
-        Chart.register(Chart.ArcElement, Chart.DoughnutController);
-        console.log("Doughnut chart components registered");
-      } else {
-        console.warn("Unable to find ArcElement or DoughnutController");
-      }
+    if (!Array.isArray(labels) || !Array.isArray(weights) || labels.length === 0 || labels.length !== weights.length) {
+        console.error("Invalid labels or weights for allocation chart.");
+        container.innerHTML = '<div class="chart-error">Insufficient or mismatched data for allocation chart.</div>';
+        return;
     }
-  } catch (error) {
-    console.error("Error registering doughnut chart components:", error);
-  }
 
-  /* ── guards ──────────────────────────────────────────────────── */
-  if (!Array.isArray(labels) || !Array.isArray(weights)) return;
-  if (labels.length === 0 || labels.length !== weights.length) return;
-
-  const container = document.getElementById(canvasId);
-  if (!container) return;
-
-  /* ── build dataset ───────────────────────────────────────────── */
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: 'Portfolio share',
-        data: weights.map(w => +(w * 100).toFixed(2)), // → percentages
-        backgroundColor: [
-          '#3366cc', '#dc3912', '#ff9900', '#109618',
-          '#990099', '#0099c6', '#dd4477', '#66aa00',
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  /* ── destroy any earlier chart tied to this <canvas> ─────────── */
-  try {
-    const existingChart = Chart.getChart(container);
-    if (existingChart) existingChart.destroy();
-  } catch (e) {
-    console.warn("Could not destroy previous chart:", e);
-  }
-
-  /* ── create a fresh canvas ──────────────────────────────────── */
-  container.innerHTML = '';
-  const canvas = document.createElement('canvas');
-  container.appendChild(canvas);
-
-  /* ── draw donut ──────────────────────────────────────────────── */
-  try {
-    const chart = new Chart(canvas, {
-      type: 'doughnut',
-      data,
-      options: {
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (tt) => `${tt.label}: ${tt.parsed}%`,
+    /* ── build dataset ───────────────────────────────────────────── */
+    const chartData = {
+        labels,
+        datasets: [
+            {
+                label: 'Portfolio share',
+                data: weights.map(w => +(w * 100).toFixed(2)), // → percentages
+                backgroundColor: [
+                    '#3366cc', '#dc3912', '#ff9900', '#109618',
+                    '#990099', '#0099c6', '#dd4477', '#66aa00',
+                ],
+                borderWidth: 1,
             },
-          },
-          legend: {
-            display: !legendId, // hide if we'll build a custom one
-          },
+        ],
+    };
+
+    /* ── build config ────────────────────────────────────────────── */
+    const chartConfig = {
+        type: 'doughnut',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Often better for donuts in containers
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (tt) => `${tt.label}: ${tt.parsed}%`,
+                    },
+                },
+                legend: {
+                    display: !legendId, // hide if we'll build a custom one
+                },
+            },
         },
-      },
-    });
+    };
+
+    /* ── render chart using utility ──────────────────────────────── */
+    const chartInstance = await renderChart(containerId, chartConfig, 'Allocation Chart');
 
     /* ── optional custom HTML legend (ul > li.swatch ⋯) ─────────── */
-    if (legendId) {
-      const ul = document.getElementById(legendId);
-      if (ul) {
-        ul.innerHTML = ''; // clear previous
-        data.labels.forEach((lbl, i) => {
-          const li = document.createElement('li');
-          const swatch = document.createElement('span');
-          swatch.className = 'swatch';
-          swatch.style.background = data.datasets[0].backgroundColor[i];
-          const labelSpan = document.createElement('span');
-          labelSpan.className = 'lbl';
-          labelSpan.textContent = lbl;
-          const valueSpan = document.createElement('span');
-          valueSpan.className = 'val';
-          valueSpan.textContent = `${data.datasets[0].data[i]}%`;
-          li.appendChild(swatch);
-          li.appendChild(labelSpan);
-          li.appendChild(valueSpan);
-          ul.appendChild(li);
-        });
-      }
+    if (chartInstance && legendId) { // Check if chart was created successfully
+        const ul = document.getElementById(legendId);
+        if (ul) {
+            ul.innerHTML = ''; // clear previous
+            chartData.labels.forEach((lbl, i) => {
+                const li = document.createElement('li');
+                const swatch = document.createElement('span');
+                swatch.className = 'swatch';
+                // Ensure colors loop correctly if more labels than colors
+                const bgColor = chartData.datasets[0].backgroundColor[i % chartData.datasets[0].backgroundColor.length];
+                swatch.style.background = bgColor;
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'lbl';
+                labelSpan.textContent = lbl;
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'val';
+                valueSpan.textContent = `${chartData.datasets[0].data[i]}%`;
+                li.appendChild(swatch);
+                li.appendChild(labelSpan);
+                li.appendChild(valueSpan);
+                ul.appendChild(li);
+            });
+        } else {
+             console.warn(`Legend container '${legendId}' not found for allocation chart.`);
+        }
     }
 
-    return chart;
-  } catch (error) {
-    console.error("Error creating Allocation Chart:", error);
-    container.innerHTML = '<div class="chart-error">Failed to render allocation chart.</div>';
-    return null;
-  }
+    // No need to return chartInstance unless the caller needs it
 }
   

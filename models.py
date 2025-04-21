@@ -11,6 +11,7 @@ class CacheEntry(db.Model):
     __tablename__ = 'portfolio_cache' # Explicit table name
 
     # Using a hash of the request parameters as the primary key
+    # String(64) accommodates SHA-256 hex digest length.
     id = db.Column(db.String(64), primary_key=True) 
     
     # Use generic JSON type for broader compatibility (SQLite, PostgreSQL)

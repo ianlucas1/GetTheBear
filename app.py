@@ -1,13 +1,12 @@
 import os
 import logging
 import re # Import regex module
-from flask import Flask, jsonify, current_app # Removed unused imports
+from flask import Flask, jsonify # Removed unused imports (current_app)
 # Removed pandas, io, math, datetime, Response, render_template, request imports
 # Removed direct analytics imports (now used in blueprint)
 from flask_wtf import CSRFProtect
 from models import db # Removed CacheEntry import (not used directly here)
-from flask.cli import with_appcontext
-import click
+# Removed flask.cli and click imports
 
 # Import the blueprint and config
 from portfolio_routes import bp as portfolio_bp

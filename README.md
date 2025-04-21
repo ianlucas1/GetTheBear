@@ -91,5 +91,6 @@ This is a Flask web application designed for analyzing stock portfolio performan
 *   Further enhance input validation edge cases. (Basic validation exists).
 *   Add user accounts/authentication.
 *   Improve UI/UX further.
-*   Database migration management is implemented via Flask-Migrate.
+*   Database migration management is implemented via Flask-Migrate.s
 
+<!-- Test change -->

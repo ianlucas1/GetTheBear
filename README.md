@@ -14,7 +14,7 @@ This is a Flask web application designed for analyzing stock portfolio performan
 
 ## Requirements
 
-*   Python 3.8+ (verify based on your specific dependencies)
+*   Python 3.11+ (as specified in `pyproject.toml`)
 *   A virtual environment tool (e.g., `venv`, `conda`)
 
 ## Setup

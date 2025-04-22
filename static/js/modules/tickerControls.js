@@ -81,14 +81,10 @@ export function addTickerRow() {
     const weightInputId = `weight-input-${tickerRowCount}`;
 
     tickerRow.innerHTML = `
-        <div class="ticker-symbol">
-            <label for="${tickerInputId}" class="sr-only">Ticker Symbol Row ${tickerRowCount}</label>
-            <input type="text" id="${tickerInputId}" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
-        </div>
-        <div class="ticker-weight">
-            <label for="${weightInputId}" class="sr-only">Weight Row ${tickerRowCount}</label>
-            <input type="number" id="${weightInputId}" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
-        </div>
+        <label for="${tickerInputId}" class="sr-only">Ticker Symbol Row ${tickerRowCount}</label>
+        <input type="text" id="${tickerInputId}" class="ticker-input" placeholder="Ticker Symbol (e.g., AAPL)" required>
+        <label for="${weightInputId}" class="sr-only">Weight Row ${tickerRowCount}</label>
+        <input type="number" id="${weightInputId}" class="weight-input" placeholder="e.g. 25" min="0" step="0.01" required>
         <button type="button" class="btn btn-danger btn-sm remove-ticker" aria-label="Remove Ticker Row ${tickerRowCount}">×</button>
     `;
     
